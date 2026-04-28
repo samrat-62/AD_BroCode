@@ -1,0 +1,789 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: AutoParts Customer Portal API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+  - name: customers
+  - name: vehicles
+  - name: appointments
+  - name: parts
+  - name: orders
+  - name: requests
+  - name: reviews
+  - name: notifications
+  - name: ai
+  - name: dashboard
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /me:
+    get:
+      operationId: getCurrentCustomer
+      tags: [customers]
+      summary: Get the currently signed in customer
+      responses:
+        "200":
+          description: Customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+    put:
+      operationId: updateCurrentCustomer
+      tags: [customers]
+      summary: Update profile of current customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCustomerInput"
+      responses:
+        "200":
+          description: Updated customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+
+  /me/notification-settings:
+    put:
+      operationId: updateNotificationSettings
+      tags: [customers]
+      summary: Update notification preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationSettings"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationSettings"
+
+  /me/loyalty:
+    get:
+      operationId: getLoyaltyStatus
+      tags: [customers]
+      summary: Get loyalty tier and progress
+      responses:
+        "200":
+          description: Loyalty info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoyaltyStatus"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary stats
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      summary: Recent activity feed
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 10, minimum: 1, maximum: 50 }
+      responses:
+        "200":
+          description: Activity feed
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
+  /vehicles:
+    get:
+      operationId: listVehicles
+      tags: [vehicles]
+      summary: List my vehicles
+      responses:
+        "200":
+          description: Vehicles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Vehicle"
+    post:
+      operationId: createVehicle
+      tags: [vehicles]
+      summary: Add a new vehicle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VehicleInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+
+  /vehicles/{id}:
+    get:
+      operationId: getVehicle
+      tags: [vehicles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Vehicle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+    put:
+      operationId: updateVehicle
+      tags: [vehicles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VehicleInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+    delete:
+      operationId: deleteVehicle
+      tags: [vehicles]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "204":
+          description: Deleted
+
+  /appointments:
+    get:
+      operationId: listAppointments
+      tags: [appointments]
+      summary: List my appointments
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [upcoming, past, all]
+            default: all
+      responses:
+        "200":
+          description: Appointments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Appointment"
+    post:
+      operationId: createAppointment
+      tags: [appointments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppointmentInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+
+  /appointments/{id}:
+    put:
+      operationId: updateAppointment
+      tags: [appointments]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppointmentInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+    delete:
+      operationId: cancelAppointment
+      tags: [appointments]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "204":
+          description: Cancelled
+
+  /appointments/time-slots:
+    get:
+      operationId: listAvailableTimeSlots
+      tags: [appointments]
+      summary: Available time slots for a date
+      parameters:
+        - { name: date, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: Slots
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: string }
+
+  /parts:
+    get:
+      operationId: listParts
+      tags: [parts]
+      summary: Browse parts catalog
+      parameters:
+        - { name: category, in: query, schema: { type: string } }
+        - { name: search, in: query, schema: { type: string } }
+        - { name: minPrice, in: query, schema: { type: number } }
+        - { name: maxPrice, in: query, schema: { type: number } }
+        - { name: inStock, in: query, schema: { type: boolean } }
+        - { name: sort, in: query, schema: { type: string, enum: [price-asc, price-desc, newest, popular], default: popular } }
+      responses:
+        "200":
+          description: Parts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Part"
+
+  /parts/categories:
+    get:
+      operationId: listPartCategories
+      tags: [parts]
+      summary: Part categories with counts
+      responses:
+        "200":
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PartCategory"
+
+  /parts/{id}:
+    get:
+      operationId: getPart
+      tags: [parts]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Part
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Part"
+
+  /orders:
+    get:
+      operationId: listOrders
+      tags: [orders]
+      summary: My order history
+      responses:
+        "200":
+          description: Orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+    post:
+      operationId: createOrder
+      tags: [orders]
+      summary: Place an order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      tags: [orders]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /requests:
+    get:
+      operationId: listPartRequests
+      tags: [requests]
+      summary: My part requests
+      responses:
+        "200":
+          description: Requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PartRequest"
+    post:
+      operationId: createPartRequest
+      tags: [requests]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PartRequestInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PartRequest"
+
+  /reviews:
+    get:
+      operationId: listMyReviews
+      tags: [reviews]
+      summary: My reviews
+      responses:
+        "200":
+          description: Reviews
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Review"
+    post:
+      operationId: createReview
+      tags: [reviews]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+
+  /reviews/{id}:
+    delete:
+      operationId: deleteReview
+      tags: [reviews]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "204":
+          description: Deleted
+
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: My notifications
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /notifications/{id}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [notifications]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "204":
+          description: Marked
+
+  /ai/predictions:
+    get:
+      operationId: listAllPredictions
+      tags: [ai]
+      summary: Predictions across all my vehicles
+      responses:
+        "200":
+          description: Predictions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AIPrediction"
+
+  /ai/predictions/{vehicleId}:
+    get:
+      operationId: listVehiclePredictions
+      tags: [ai]
+      parameters:
+        - { name: vehicleId, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Predictions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AIPrediction"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+
+    Customer:
+      type: object
+      required: [id, fullName, email, totalSpend, loyaltyPoints, createdAt, notificationSettings]
+      properties:
+        id: { type: integer }
+        fullName: { type: string }
+        email: { type: string }
+        phone: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        dob: { type: string, nullable: true }
+        avatarUrl: { type: string, nullable: true }
+        totalSpend: { type: number }
+        loyaltyPoints: { type: integer }
+        createdAt: { type: string, format: date-time }
+        notificationSettings:
+          $ref: "#/components/schemas/NotificationSettings"
+
+    UpdateCustomerInput:
+      type: object
+      properties:
+        fullName: { type: string }
+        phone: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        dob: { type: string, nullable: true }
+        avatarUrl: { type: string, nullable: true }
+
+    NotificationSettings:
+      type: object
+      required: [emailInvoices, appointmentReminders, aiAlerts, promotionalOffers, overdueReminders]
+      properties:
+        emailInvoices: { type: boolean }
+        appointmentReminders: { type: boolean }
+        aiAlerts: { type: boolean }
+        promotionalOffers: { type: boolean }
+        overdueReminders: { type: boolean }
+
+    LoyaltyStatus:
+      type: object
+      required: [tier, totalSpend, nextTier, nextTierThreshold, progressPercent, benefits]
+      properties:
+        tier: { type: string, enum: [Bronze, Silver, Gold, Platinum] }
+        totalSpend: { type: number }
+        nextTier: { type: string, nullable: true }
+        nextTierThreshold: { type: number, nullable: true }
+        progressPercent: { type: number }
+        benefits:
+          type: array
+          items: { type: string }
+        recentDiscounts:
+          type: array
+          items:
+            type: object
+            required: [orderId, amount, appliedAt]
+            properties:
+              orderId: { type: integer }
+              amount: { type: number }
+              appliedAt: { type: string, format: date-time }
+
+    DashboardSummary:
+      type: object
+      required: [totalPurchases, activeAppointments, loyaltyPoints, pendingRequests, lifetimeSpend, vehicleCount]
+      properties:
+        totalPurchases: { type: integer }
+        activeAppointments: { type: integer }
+        loyaltyPoints: { type: integer }
+        pendingRequests: { type: integer }
+        lifetimeSpend: { type: number }
+        vehicleCount: { type: integer }
+
+    ActivityItem:
+      type: object
+      required: [id, type, title, status, occurredAt]
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [purchase, appointment, request, review] }
+        title: { type: string }
+        status: { type: string }
+        amount: { type: number, nullable: true }
+        occurredAt: { type: string, format: date-time }
+
+    Vehicle:
+      type: object
+      required: [id, make, model, year, plate, status]
+      properties:
+        id: { type: integer }
+        make: { type: string }
+        model: { type: string }
+        year: { type: integer }
+        plate: { type: string }
+        color: { type: string, nullable: true }
+        engineCC: { type: integer, nullable: true }
+        fuelType: { type: string, enum: [Petrol, Diesel, Electric, Hybrid], nullable: true }
+        photoUrl: { type: string, nullable: true }
+        status: { type: string, enum: [active, inactive] }
+
+    VehicleInput:
+      type: object
+      required: [make, model, year, plate]
+      properties:
+        make: { type: string }
+        model: { type: string }
+        year: { type: integer }
+        plate: { type: string }
+        color: { type: string, nullable: true }
+        engineCC: { type: integer, nullable: true }
+        fuelType: { type: string, enum: [Petrol, Diesel, Electric, Hybrid], nullable: true }
+        photoUrl: { type: string, nullable: true }
+        status: { type: string, enum: [active, inactive] }
+
+    Appointment:
+      type: object
+      required: [id, vehicleId, vehicleLabel, serviceType, scheduledAt, status]
+      properties:
+        id: { type: integer }
+        vehicleId: { type: integer }
+        vehicleLabel: { type: string }
+        serviceType: { type: string }
+        scheduledAt: { type: string, format: date-time }
+        status: { type: string, enum: [pending, confirmed, completed, cancelled] }
+        notes: { type: string, nullable: true }
+        technician: { type: string, nullable: true }
+        cost: { type: number, nullable: true }
+        hasReview: { type: boolean }
+
+    AppointmentInput:
+      type: object
+      required: [vehicleId, serviceType, scheduledAt]
+      properties:
+        vehicleId: { type: integer }
+        serviceType: { type: string }
+        scheduledAt: { type: string, format: date-time }
+        notes: { type: string, nullable: true }
+        status: { type: string, enum: [pending, confirmed, completed, cancelled] }
+
+    Part:
+      type: object
+      required: [id, name, category, price, stockQty]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        category: { type: string }
+        price: { type: number }
+        stockQty: { type: integer }
+        description: { type: string, nullable: true }
+        imageUrl: { type: string, nullable: true }
+        partNumber: { type: string, nullable: true }
+        compatibleModels:
+          type: array
+          items: { type: string }
+        popularity: { type: integer }
+        createdAt: { type: string, format: date-time }
+
+    PartCategory:
+      type: object
+      required: [name, count]
+      properties:
+        name: { type: string }
+        count: { type: integer }
+
+    Order:
+      type: object
+      required: [id, total, status, createdAt, items]
+      properties:
+        id: { type: integer }
+        total: { type: number }
+        subtotal: { type: number }
+        discount: { type: number }
+        status: { type: string, enum: [pending, processing, completed, cancelled] }
+        deliveryType: { type: string, enum: [pickup, delivery] }
+        paymentMethod: { type: string }
+        createdAt: { type: string, format: date-time }
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+
+    OrderItem:
+      type: object
+      required: [id, partId, partName, quantity, unitPrice]
+      properties:
+        id: { type: integer }
+        partId: { type: integer }
+        partName: { type: string }
+        quantity: { type: integer }
+        unitPrice: { type: number }
+
+    OrderInput:
+      type: object
+      required: [items, deliveryType, paymentMethod]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [partId, quantity]
+            properties:
+              partId: { type: integer }
+              quantity: { type: integer, minimum: 1 }
+        deliveryType: { type: string, enum: [pickup, delivery] }
+        paymentMethod: { type: string }
+        deliveryAddress: { type: string, nullable: true }
+
+    PartRequest:
+      type: object
+      required: [id, partName, status, createdAt]
+      properties:
+        id: { type: integer }
+        partName: { type: string }
+        partNumber: { type: string, nullable: true }
+        vehicleId: { type: integer, nullable: true }
+        vehicleLabel: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        imageUrl: { type: string, nullable: true }
+        status: { type: string, enum: [pending, found, unavailable] }
+        createdAt: { type: string, format: date-time }
+
+    PartRequestInput:
+      type: object
+      required: [partName]
+      properties:
+        partName: { type: string }
+        partNumber: { type: string, nullable: true }
+        vehicleId: { type: integer, nullable: true }
+        description: { type: string, nullable: true }
+        imageUrl: { type: string, nullable: true }
+
+    Review:
+      type: object
+      required: [id, rating, body, status, createdAt]
+      properties:
+        id: { type: integer }
+        appointmentId: { type: integer, nullable: true }
+        appointmentLabel: { type: string, nullable: true }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        title: { type: string, nullable: true }
+        body: { type: string }
+        status: { type: string, enum: [pending, published] }
+        createdAt: { type: string, format: date-time }
+
+    ReviewInput:
+      type: object
+      required: [rating, body]
+      properties:
+        appointmentId: { type: integer, nullable: true }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        title: { type: string, nullable: true }
+        body: { type: string }
+
+    Notification:
+      type: object
+      required: [id, type, title, message, read, createdAt]
+      properties:
+        id: { type: integer }
+        type: { type: string, enum: [appointment, order, ai, promo, system] }
+        title: { type: string }
+        message: { type: string }
+        read: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    AIPrediction:
+      type: object
+      required: [id, vehicleId, vehicleLabel, partName, riskLevel, recommendedAction, predictedAt]
+      properties:
+        id: { type: integer }
+        vehicleId: { type: integer }
+        vehicleLabel: { type: string }
+        partName: { type: string }
+        riskLevel: { type: string, enum: [low, medium, high] }
+        recommendedAction: { type: string }
+        estimatedFailureWindow: { type: string, nullable: true }
+        predictedAt: { type: string, format: date-time }
