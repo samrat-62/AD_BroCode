@@ -5,8 +5,12 @@
   "scripts": {
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
     "dev": "corepack pnpm --filter @workspace/customer-portal dev",
+    "dev:admin": "corepack pnpm --filter @workspace/admin-portal dev",
+    "dev:staff": "corepack pnpm --filter @workspace/staff-portal dev",
     "build": "corepack pnpm run typecheck && corepack pnpm -r --if-present run build",
     "serve": "corepack pnpm --filter @workspace/customer-portal serve",
+    "serve:admin": "corepack pnpm --filter @workspace/admin-portal serve",
+    "serve:staff": "corepack pnpm --filter @workspace/staff-portal serve",
     "typecheck:libs": "tsc --build",
     "typecheck": "corepack pnpm run typecheck:libs && corepack pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },

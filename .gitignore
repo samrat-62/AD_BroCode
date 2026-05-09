@@ -63,7 +63,12 @@ BenchmarkDotNet.Artifacts/
 # .NET
 project.lock.json
 project.fragment.lock.json
-artifacts/
+/artifacts/
+frontend/artifacts/*/dev-server.*.log
+frontend/artifacts/*/dist/
+frontend/artifacts/*/.replit-artifact/
+.replit
+replit.nix
 
 # Tye
 .tye/

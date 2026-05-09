@@ -3,17 +3,18 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
-const rawPort = process.env.PORT ?? "5174";
+const rawPort = process.env.PORT ?? "5175";
 const port = Number(rawPort);
 
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-const previewPort = Number(process.env.PREVIEW_PORT ?? "4174");
+const rawPreviewPort = process.env.PREVIEW_PORT ?? "4175";
+const previewPort = Number(rawPreviewPort);
 
 if (Number.isNaN(previewPort) || previewPort <= 0) {
-  throw new Error(`Invalid PREVIEW_PORT value: "${process.env.PREVIEW_PORT}"`);
+  throw new Error(`Invalid PREVIEW_PORT value: "${rawPreviewPort}"`);
 }
 
 export default defineConfig({

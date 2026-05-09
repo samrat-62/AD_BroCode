@@ -1,5 +1,5 @@
 {
-  "name": "@workspace/admin-portal",
+  "name": "@workspace/staff-portal",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -69,5 +69,8 @@
     "vite": "catalog:",
     "wouter": "^3.3.5",
     "zod": "catalog:"
+  },
+  "dependencies": {
+    "zustand": "^5.0.12"
   }
 }
