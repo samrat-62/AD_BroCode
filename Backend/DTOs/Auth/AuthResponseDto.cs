@@ -6,5 +6,6 @@ public sealed record AuthResponseDto(
     string Email,
     string Role,
     bool IsActive,
+    Guid SessionId,
     string Token,
     DateTimeOffset ExpiresAtUtc);

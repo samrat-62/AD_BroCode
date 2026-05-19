@@ -10,7 +10,7 @@ import { ArrowLeft, Phone, Mail, MapPin, User, Package, FileText, DollarSign } f
 export default function VendorDetailPage() {
   const [, params] = useRoute("/admin/vendors/:id");
   const [, setLocation] = useLocation();
-  const id = params ? parseInt(params.id) : 0;
+  const id = params?.id ?? "";
   const { data: vendor, isLoading } = useGetVendor({ id });
 
   if (isLoading) {

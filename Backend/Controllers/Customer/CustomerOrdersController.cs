@@ -209,7 +209,7 @@ public sealed class CustomerOrdersController : CustomerControllerBase
         return status switch
         {
             OrderStatus.Processing => "processing",
-            OrderStatus.Completed => "completed",
+            OrderStatus.Completed => "delivered",
             OrderStatus.Cancelled => "cancelled",
             _ => "pending"
         };

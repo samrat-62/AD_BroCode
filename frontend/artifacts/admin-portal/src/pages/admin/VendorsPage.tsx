@@ -21,9 +21,9 @@ export default function VendorsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showDialog, setShowDialog] = useState(false);
-  const [editId, setEditId] = useState<number | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<VendorForm>(emptyForm);
-  const [deleting, setDeleting] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const { data, isLoading } = useListVendors({ search: search || undefined, page, limit: 15 });
   const createMut = useCreateVendor();
@@ -52,7 +52,7 @@ export default function VendorsPage() {
     }
   }
 
-  async function handleDelete(id: number) {
+  async function handleDelete(id: string) {
     try {
       await deleteMut.mutateAsync({ id });
       toast.success("Vendor deleted");

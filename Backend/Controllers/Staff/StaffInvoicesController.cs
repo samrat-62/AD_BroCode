@@ -2,18 +2,27 @@ using Backend.Data;
 using Backend.DTOs.Staff;
 using Backend.Models.Credits;
 using Backend.Models.Sales;
+using Backend.Services.Email;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Backend.Controllers.Staff;
 
 public sealed class StaffInvoicesController : StaffControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly IEmailService _emailService;
+    private readonly ILogger<StaffInvoicesController> _logger;
 
-    public StaffInvoicesController(ApplicationDbContext dbContext)
+    public StaffInvoicesController(
+        ApplicationDbContext dbContext,
+        IEmailService emailService,
+        ILogger<StaffInvoicesController> logger)
     {
         _dbContext = dbContext;
+        _emailService = emailService;
+        _logger = logger;
     }
 
     [HttpGet("invoices")]
@@ -120,15 +129,50 @@ public sealed class StaffInvoicesController : StaffControllerBase
         SendStaffInvoiceEmailRequestDto request,
         CancellationToken cancellationToken)
     {
-        var exists = await _dbContext.SalesInvoices
-            .AnyAsync(invoice => invoice.Id == id, cancellationToken);
+        if (string.IsNullOrWhiteSpace(request.To))
+        {
+            return BadRequest(new { message = "Recipient email is required." });
+        }
 
-        if (!exists)
+        var invoice = await _dbContext.SalesInvoices
+            .AsNoTracking()
+            .SingleOrDefaultAsync(invoice => invoice.Id == id, cancellationToken);
+
+        if (invoice is null)
         {
             return NotFound(new { message = "Invoice was not found." });
         }
 
+        var subject = string.IsNullOrWhiteSpace(request.Subject)
+            ? $"Invoice {invoice.InvoiceNumber}"
+            : request.Subject.Trim();
+        var message = string.IsNullOrWhiteSpace(request.Message)
+            ? $"Your invoice {invoice.InvoiceNumber} total is {invoice.Total}."
+            : request.Message.Trim();
+
+        try
+        {
+            await _emailService.SendEmailAsync(
+                new EmailMessage(request.To, subject, message),
+                cancellationToken);
+        }
+        catch (Exception exception) when (IsEmailFailure(exception))
+        {
+            _logger.LogError(exception, "Failed to send invoice email for invoice {InvoiceId}.", id);
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                new { message = "Invoice email could not be sent. Check SMTP configuration." });
+        }
+
         return Ok(new StaffActionResultDto(id, request.To, DateTimeOffset.UtcNow));
+    }
+
+    private static bool IsEmailFailure(Exception exception)
+    {
+        return exception is EmailSendException
+            or InvalidOperationException
+            or ArgumentException
+            or OptionsValidationException;
     }
 
     private static InvoiceStatus ParseInvoiceStatus(string status)

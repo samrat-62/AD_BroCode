@@ -1,8 +1,11 @@
 using Backend.Data;
 using Backend.DTOs.Staff;
 using Backend.Models.Credits;
+using Backend.Models.Admin;
+using Backend.Models.Inventory;
 using Backend.Models.Notifications;
 using Backend.Models.Sales;
+using Backend.Services.Email;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,10 +14,17 @@ namespace Backend.Controllers.Staff;
 public sealed class StaffSalesController : StaffControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly IEmailService _emailService;
+    private readonly ILogger<StaffSalesController> _logger;
 
-    public StaffSalesController(ApplicationDbContext dbContext)
+    public StaffSalesController(
+        ApplicationDbContext dbContext,
+        IEmailService emailService,
+        ILogger<StaffSalesController> logger)
     {
         _dbContext = dbContext;
+        _emailService = emailService;
+        _logger = logger;
     }
 
     [HttpPost("sales")]
@@ -97,6 +107,8 @@ public sealed class StaffSalesController : StaffControllerBase
             Notes = NormalizeOptional(request.Notes)
         };
 
+        var newLowStockParts = new List<Part>();
+
         foreach (var item in request.Items)
         {
             var part = parts[item.PartId];
@@ -104,6 +116,11 @@ public sealed class StaffSalesController : StaffControllerBase
             part.StockQuantity -= item.Quantity;
             part.Popularity += item.Quantity;
             part.UpdatedAt = DateTimeOffset.UtcNow;
+
+            if (stockBefore > part.ReorderLevel && part.StockQuantity <= part.ReorderLevel)
+            {
+                newLowStockParts.Add(part);
+            }
 
             invoice.Items.Add(new SalesInvoiceItem
             {
@@ -141,8 +158,12 @@ public sealed class StaffSalesController : StaffControllerBase
 
         _dbContext.SalesInvoices.Add(invoice);
         AddLowStockNotifications(parts.Values);
+        var lowStockEmailParts = await AddAdminLowStockNotifications(
+            newLowStockParts,
+            cancellationToken);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await SendLowStockAlertEmails(lowStockEmailParts, cancellationToken);
 
         invoice.Customer = customer;
         if (request.VehicleId.HasValue)
@@ -203,6 +224,68 @@ public sealed class StaffSalesController : StaffControllerBase
                 Message = $"{part.PartNumber ?? part.Name} has {part.StockQuantity} units left.",
                 Link = "/notifications"
             });
+        }
+    }
+
+    private async Task<IReadOnlyList<Part>> AddAdminLowStockNotifications(
+        IEnumerable<Part> parts,
+        CancellationToken cancellationToken)
+    {
+        var emailParts = new List<Part>();
+
+        foreach (var part in parts)
+        {
+            var message = part.StockQuantity == 0
+                ? $"{part.Name} is out of stock."
+                : $"{part.Name} is below reorder level.";
+
+            var alreadyExists = await _dbContext.AdminNotifications
+                .AnyAsync(
+                    notification => !notification.IsRead
+                        && notification.Type == "low_stock"
+                        && notification.Message == message,
+                    cancellationToken);
+
+            if (alreadyExists)
+            {
+                continue;
+            }
+
+            _dbContext.AdminNotifications.Add(new AdminNotification
+            {
+                Type = "low_stock",
+                Message = message
+            });
+            emailParts.Add(part);
+        }
+
+        return emailParts;
+    }
+
+    private async Task SendLowStockAlertEmails(
+        IEnumerable<Part> parts,
+        CancellationToken cancellationToken)
+    {
+        foreach (var part in parts)
+        {
+            try
+            {
+                await _emailService.SendLowStockAlertAsync(
+                    new LowStockAlertEmail(
+                        part.Name,
+                        part.PartNumber,
+                        part.StockQuantity,
+                        part.ReorderLevel,
+                        null),
+                    cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                _logger.LogError(
+                    exception,
+                    "Failed to send low-stock email for part {PartId}.",
+                    part.Id);
+            }
         }
     }
 

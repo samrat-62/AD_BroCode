@@ -1,10 +1,12 @@
 using Backend.Data;
 using Backend.Services.Auth;
 using Backend.Services.Application;
+using Backend.Services.Email;
 using Backend.Services.Health;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
 using System.Text;
 
 namespace Backend.Extensions;
@@ -23,10 +25,17 @@ public static class ServiceCollectionExtensions
             options.UseNpgsql(connectionString);
         });
 
+        services.AddHttpContextAccessor();
         AddJwtAuthentication(services, configuration);
+
+        services
+            .AddOptions<EmailSettings>()
+            .Bind(configuration.GetSection(EmailSettings.SectionName))
+            .Validate(settings => settings.IsValidForSending(), "EmailSettings is incomplete.");
 
         services.AddSingleton<IApplicationInfoService, ApplicationInfoService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IHealthService, HealthService>();
 
         return services;
@@ -59,6 +68,39 @@ public static class ServiceCollectionExtensions
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
                     ValidateLifetime = true,
                     ClockSkew = TimeSpan.FromMinutes(1)
+                };
+
+                options.Events = new JwtBearerEvents
+                {
+                    OnTokenValidated = async context =>
+                    {
+                        var rawUserId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+                        var rawSessionId = context.Principal?.FindFirst("sid")?.Value;
+
+                        if (!Guid.TryParse(rawUserId, out var userId) ||
+                            !Guid.TryParse(rawSessionId, out var sessionId))
+                        {
+                            context.Fail("Token session is missing.");
+                            return;
+                        }
+
+                        var dbContext = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
+                        var now = DateTimeOffset.UtcNow;
+                        var sessionIsActive = await dbContext.UserSessions
+                            .AsNoTracking()
+                            .AnyAsync(
+                                session =>
+                                    session.Id == sessionId &&
+                                    session.UserId == userId &&
+                                    session.RevokedAt == null &&
+                                    session.ExpiresAtUtc > now,
+                                context.HttpContext.RequestAborted);
+
+                        if (!sessionIsActive)
+                        {
+                            context.Fail("Session is inactive or expired.");
+                        }
+                    }
                 };
             });
 

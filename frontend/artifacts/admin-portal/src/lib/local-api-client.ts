@@ -1,15 +1,19 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
-type AuthTokenGetter = () => Promise<string | null> | string | null;
+export type AuthTokenGetter = () => Promise<string | null> | string | null;
+
+type Id = string;
 
 type ListParams = {
   search?: string;
   page?: number;
   limit?: number;
-  categoryId?: number;
+  categoryId?: Id;
   stockStatus?: "in_stock" | "low_stock" | "out_of_stock";
   isRead?: boolean;
 };
+
+type QueryParams = Record<string, string | number | boolean | null | undefined>;
 
 type PagedResult<T> = {
   data: T[];
@@ -20,59 +24,131 @@ type PagedResult<T> = {
   [key: string]: unknown;
 };
 
-type StaffMember = {
-  id: number;
+type AuthResponse = {
+  id: Id;
   fullName: string;
   email: string;
   role: string;
-  phoneNumber?: string;
+  isActive: boolean;
+  sessionId: Id;
+  token: string;
+  expiresAtUtc: string;
+};
+
+type DashboardSummary = {
+  totalRevenue: number;
+  revenueChange: number;
+  totalInvoices: number;
+  invoicesChange: number;
+  totalPartsSkus: number;
+  lowStockAlerts: number;
+  activeStaff: number;
+  activeVendors: number;
+};
+
+type StaffMember = {
+  id: Id;
+  userId: Id;
+  fullName: string;
+  email: string;
+  role: string;
+  phoneNumber?: string | null;
   joinDate: string;
   isActive: boolean;
 };
 
 type Vendor = {
-  id: number;
+  id: Id;
   name: string;
-  contactPerson?: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  notes?: string;
+  contactPerson?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  notes?: string | null;
   partsCount?: number;
 };
 
+type VendorDetail = Vendor & {
+  partsSuppliedCount: number;
+  totalPurchaseValue: number;
+  parts: Array<{
+    id: Id;
+    name: string;
+    partNumber?: string | null;
+    stockQuantity: number;
+    reorderLevel: number;
+    unitPrice: number;
+  }>;
+  purchaseInvoices: Array<{
+    id: Id;
+    invoiceNumber: string;
+    totalCost: number;
+    createdAt: string;
+  }>;
+};
+
 type PartCategory = {
-  id: number;
+  id: Id;
   name: string;
 };
 
 type Part = {
-  id: number;
+  id: Id;
   name: string;
-  partNumber?: string;
-  categoryId: number;
+  partNumber?: string | null;
+  categoryId: Id;
   categoryName: string;
-  description?: string;
+  description?: string | null;
   unitPrice: number;
   stockQuantity: number;
   reorderLevel: number;
-  vendorId?: number;
-  vendorName?: string;
+  vendorId?: Id | null;
+  vendorName?: string | null;
+};
+
+type LowStockPart = {
+  partId: Id;
+  partName: string;
+  category: string;
+  currentStock: number;
+  reorderLevel: number;
+  vendorName?: string | null;
+};
+
+type AdminPartRequest = {
+  id: Id;
+  customerId: Id;
+  customerName: string;
+  customerEmail: string;
+  phone: string;
+  vehicleId?: Id | null;
+  vehicleLabel?: string | null;
+  partName: string;
+  partNumber?: string | null;
+  description?: string | null;
+  imageUrl?: string | null;
+  status: "pending" | "acknowledged" | "found" | "unavailable";
+  createdAt: string;
+  updatedAt: string;
+};
+
+type PartListResult = PagedResult<Part> & {
+  lowStockCount: number;
 };
 
 type PurchaseInvoice = {
-  id: number;
+  id: Id;
   invoiceNumber: string;
-  vendorId: number;
+  vendorId: Id;
   vendorName: string;
-  vendorPhone?: string;
+  vendorPhone?: string | null;
   totalCost: number;
   itemsCount: number;
   createdAt: string;
-  createdByName: string;
-  notes?: string;
+  createdByName?: string | null;
+  notes?: string | null;
   lineItems: Array<{
-    partId: number;
+    partId: Id;
     partName: string;
     quantity: number;
     unitCost: number;
@@ -83,687 +159,394 @@ type PurchaseInvoice = {
 };
 
 type NotificationItem = {
-  id: number;
+  id: Id;
   type: string;
   message: string;
   isRead: boolean;
   createdAt: string;
 };
 
-let authTokenGetter: AuthTokenGetter | null = null;
-let nextStaffId = 4;
-let nextVendorId = 4;
-let nextPartId = 5;
-let nextCategoryId = 5;
-let nextInvoiceId = 3;
-
-const staff: StaffMember[] = [
-  {
-    id: 1,
-    fullName: "Aarav Sharma",
-    email: "aarav@autoparts.local",
-    role: "manager",
-    phoneNumber: "9800000001",
-    joinDate: "2025-07-15",
-    isActive: true,
-  },
-  {
-    id: 2,
-    fullName: "Nisha Karki",
-    email: "nisha@autoparts.local",
-    role: "sales_staff",
-    phoneNumber: "9800000002",
-    joinDate: "2025-09-03",
-    isActive: true,
-  },
-  {
-    id: 3,
-    fullName: "Rajan Thapa",
-    email: "rajan@autoparts.local",
-    role: "sales_staff",
-    phoneNumber: "9800000003",
-    joinDate: "2024-11-20",
-    isActive: false,
-  },
-];
-
-const vendors: Vendor[] = [
-  {
-    id: 1,
-    name: "Everest Auto Supply",
-    contactPerson: "Suman Rai",
-    phone: "014412233",
-    email: "sales@everestauto.local",
-    address: "Teku, Kathmandu",
-    notes: "Preferred vendor for filters and brake pads.",
-  },
-  {
-    id: 2,
-    name: "Himalayan Motors Parts",
-    contactPerson: "Maya Gurung",
-    phone: "015556677",
-    email: "orders@himalayanparts.local",
-    address: "Lalitpur Industrial Area",
-  },
-  {
-    id: 3,
-    name: "Rapid Tyre House",
-    contactPerson: "Bibek Lama",
-    phone: "014449999",
-    email: "hello@rapidtyre.local",
-    address: "Balaju, Kathmandu",
-  },
-];
-
-const categories: PartCategory[] = [
-  { id: 1, name: "Filters" },
-  { id: 2, name: "Brakes" },
-  { id: 3, name: "Lighting" },
-  { id: 4, name: "Tyres" },
-];
-
-const parts: Part[] = [
-  {
-    id: 1,
-    name: "Premium Oil Filter",
-    partNumber: "OF-204",
-    categoryId: 1,
-    categoryName: "Filters",
-    unitPrice: 18.5,
-    stockQuantity: 42,
-    reorderLevel: 10,
-    vendorId: 1,
-    vendorName: "Everest Auto Supply",
-  },
-  {
-    id: 2,
-    name: "Ceramic Brake Pads",
-    partNumber: "BP-118",
-    categoryId: 2,
-    categoryName: "Brakes",
-    unitPrice: 64.99,
-    stockQuantity: 8,
-    reorderLevel: 12,
-    vendorId: 1,
-    vendorName: "Everest Auto Supply",
-  },
-  {
-    id: 3,
-    name: "LED Headlight Pair",
-    partNumber: "HL-77",
-    categoryId: 3,
-    categoryName: "Lighting",
-    unitPrice: 95,
-    stockQuantity: 0,
-    reorderLevel: 5,
-    vendorId: 2,
-    vendorName: "Himalayan Motors Parts",
-  },
-  {
-    id: 4,
-    name: "All Weather Tyre",
-    partNumber: "TY-401",
-    categoryId: 4,
-    categoryName: "Tyres",
-    unitPrice: 129.5,
-    stockQuantity: 24,
-    reorderLevel: 8,
-    vendorId: 3,
-    vendorName: "Rapid Tyre House",
-  },
-];
-
-const purchaseInvoices: PurchaseInvoice[] = [
-  {
-    id: 1,
-    invoiceNumber: "PI-2026-0001",
-    vendorId: 1,
-    vendorName: "Everest Auto Supply",
-    vendorPhone: "014412233",
-    totalCost: 740,
-    itemsCount: 2,
-    createdAt: "2026-05-01T10:30:00.000Z",
-    createdByName: "Aarav Sharma",
-    notes: "Monthly stock refill.",
-    lineItems: [
-      {
-        partId: 1,
-        partName: "Premium Oil Filter",
-        quantity: 20,
-        unitCost: 12,
-        subtotal: 240,
-        stockBefore: 22,
-        stockAfter: 42,
-      },
-      {
-        partId: 2,
-        partName: "Ceramic Brake Pads",
-        quantity: 10,
-        unitCost: 50,
-        subtotal: 500,
-        stockBefore: 0,
-        stockAfter: 10,
-      },
-    ],
-  },
-  {
-    id: 2,
-    invoiceNumber: "PI-2026-0002",
-    vendorId: 3,
-    vendorName: "Rapid Tyre House",
-    vendorPhone: "014449999",
-    totalCost: 1942.5,
-    itemsCount: 1,
-    createdAt: "2026-05-05T08:15:00.000Z",
-    createdByName: "Nisha Karki",
-    lineItems: [
-      {
-        partId: 4,
-        partName: "All Weather Tyre",
-        quantity: 15,
-        unitCost: 129.5,
-        subtotal: 1942.5,
-        stockBefore: 9,
-        stockAfter: 24,
-      },
-    ],
-  },
-];
-
-const notifications: NotificationItem[] = [
-  {
-    id: 1,
-    type: "low_stock",
-    message: "LED Headlight Pair is out of stock.",
-    isRead: false,
-    createdAt: "2026-05-08T09:00:00.000Z",
-  },
-  {
-    id: 2,
-    type: "warning",
-    message: "Ceramic Brake Pads are below reorder level.",
-    isRead: false,
-    createdAt: "2026-05-07T15:20:00.000Z",
-  },
-  {
-    id: 3,
-    type: "success",
-    message: "Purchase invoice PI-2026-0002 was recorded.",
-    isRead: true,
-    createdAt: "2026-05-05T08:20:00.000Z",
-  },
-];
-
-let settings = {
-  companyName: "AutoParts",
-  companyAddress: "Kathmandu, Nepal",
-  currencySymbol: "$",
-  lowStockThreshold: 10,
-  loyaltyDiscountThreshold: 5000,
-  loyaltyDiscountPercentage: 10,
+type FinancialReport = {
+  summary: {
+    totalRevenue: number;
+    totalInvoices: number;
+    averageInvoiceValue: number;
+    netCashReceived: number;
+  };
+  chartData: Array<{
+    date: string;
+    revenue: number;
+    invoiceCount: number;
+  }>;
+  topParts: Array<{
+    partId: Id;
+    partName: string;
+    totalSold: number;
+    totalRevenue: number;
+  }>;
+  tableRows: Array<{
+    date: string;
+    revenue: number;
+    invoiceCount: number;
+  }>;
 };
+
+type AdminSettings = {
+  companyName: string;
+  companyAddress?: string | null;
+  currencySymbol: string;
+  lowStockThreshold: number;
+  loyaltyDiscountThreshold: number;
+  loyaltyDiscountPercentage: number;
+};
+
+type ApiError = Error & {
+  status?: number;
+  data?: unknown;
+};
+
+let authTokenGetter: AuthTokenGetter | null = null;
+let apiBaseUrl = normalizeBaseUrl(import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5217/api");
 
 export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
   authTokenGetter = getter;
 }
 
-export function setBaseUrl(): void {
-  // The admin portal uses local data until backend admin endpoints are added.
+export function setBaseUrl(url?: string | null): void {
+  apiBaseUrl = normalizeBaseUrl(url ?? "http://localhost:5217/api");
 }
 
-function containsSearch(value: string | undefined, search: string): boolean {
-  return value?.toLowerCase().includes(search.toLowerCase()) ?? false;
+function normalizeBaseUrl(url: string): string {
+  return url.replace(/\/+$/, "");
 }
 
-function paginate<T>(rows: T[], params: ListParams = {}, extra: Record<string, unknown> = {}): PagedResult<T> {
-  const page = params.page ?? 1;
-  const limit = params.limit ?? (rows.length || 1);
-  const total = rows.length;
-  const totalPages = Math.max(1, Math.ceil(total / limit));
-  const start = (page - 1) * limit;
+function buildUrl(path: string, params?: QueryParams): string {
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  const base = apiBaseUrl.startsWith("http")
+    ? apiBaseUrl
+    : `${window.location.origin}${apiBaseUrl.startsWith("/") ? apiBaseUrl : `/${apiBaseUrl}`}`;
+  const url = new URL(`${base}${cleanPath}`);
 
-  return {
-    data: rows.slice(start, start + limit),
-    total,
-    page,
-    limit,
-    totalPages,
-    ...extra,
-  };
+  for (const [key, value] of Object.entries(params ?? {})) {
+    if (value !== undefined && value !== null && value !== "") {
+      url.searchParams.set(key, String(value));
+    }
+  }
+
+  return url.toString();
 }
 
-function vendorName(vendorId: number | undefined): string | undefined {
-  return vendors.find((vendor) => vendor.id === vendorId)?.name;
+async function getAuthToken(): Promise<string | null> {
+  return authTokenGetter ? await authTokenGetter() : null;
 }
 
-function refreshVendorCounts(): void {
-  for (const vendor of vendors) {
-    vendor.partsCount = parts.filter((part) => part.vendorId === vendor.id).length;
+async function readResponse(response: Response): Promise<unknown> {
+  if (response.status === 204) {
+    return undefined;
+  }
+
+  const text = await response.text();
+  if (!text) {
+    return undefined;
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    return JSON.parse(text);
+  }
+
+  return text;
+}
+
+function getErrorMessage(data: unknown, status: number): string {
+  if (data && typeof data === "object") {
+    const record = data as Record<string, unknown>;
+    if (typeof record.message === "string") return record.message;
+    if (typeof record.title === "string") return record.title;
+  }
+
+  if (typeof data === "string" && data.trim()) {
+    return data;
+  }
+
+  return `Request failed with status ${status}.`;
+}
+
+function redirectToLoginAfterUnauthorized(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  localStorage.removeItem("admin_token");
+
+  const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+  const loginPath = `${basePath}/admin/login`;
+
+  if (window.location.pathname !== loginPath) {
+    window.location.assign(loginPath);
   }
 }
 
-function getLowStockRows(): Array<Record<string, unknown>> {
-  return parts
-    .filter((part) => part.stockQuantity <= part.reorderLevel)
-    .map((part) => ({
-      partId: part.id,
-      partName: part.name,
-      category: part.categoryName,
-      currentStock: part.stockQuantity,
-      reorderLevel: part.reorderLevel,
-      vendorName: part.vendorName ?? "Unassigned",
-    }));
+async function apiRequest<T>(
+  path: string,
+  options: {
+    method?: string;
+    body?: unknown;
+    params?: QueryParams;
+    auth?: boolean;
+    signal?: AbortSignal;
+  } = {},
+): Promise<T> {
+  const headers = new Headers();
+  const hasBody = options.body !== undefined;
+
+  if (hasBody) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  if (options.auth !== false) {
+    const token = await getAuthToken();
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+  }
+
+  const response = await fetch(buildUrl(path, options.params), {
+    method: options.method ?? "GET",
+    headers,
+    body: hasBody ? JSON.stringify(options.body) : undefined,
+    signal: options.signal,
+  });
+
+  const data = await readResponse(response);
+
+  if (!response.ok) {
+    if (response.status === 401 && options.auth !== false) {
+      redirectToLoginAfterUnauthorized();
+    }
+
+    const error = new Error(getErrorMessage(data, response.status)) as ApiError;
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+
+  return data as T;
 }
+
+const get = <T>(path: string, params?: QueryParams, signal?: AbortSignal) =>
+  apiRequest<T>(path, { params, signal });
+
+const post = <T>(path: string, body?: unknown) =>
+  apiRequest<T>(path, { method: "POST", body });
+
+const put = <T>(path: string, body?: unknown) =>
+  apiRequest<T>(path, { method: "PUT", body });
+
+const del = (path: string) =>
+  apiRequest<void>(path, { method: "DELETE" });
 
 export function useAdminLogin() {
-  return useMutation<{ token: string }, Error, { data: { email: string; password: string } }>({
-    mutationFn: async ({ data }) => {
-      if (!data.email || !data.password) {
-        throw new Error("Email and password are required.");
-      }
-
-      return { token: "local-admin-token" };
-    },
-  });
-}
-
-export function useGetDashboardSummary() {
-  return useQuery<any>({
-    queryKey: ["/v1/admin/dashboard"],
-    queryFn: async () => ({
-      totalRevenue: 148750,
-      revenueChange: 12,
-      totalInvoices: purchaseInvoices.length,
-      invoicesChange: 8,
-      totalPartsSkus: parts.length,
-      lowStockAlerts: getLowStockRows().length,
-      activeStaff: staff.filter((member) => member.isActive).length,
-      activeVendors: vendors.length,
+  return useMutation<AuthResponse, ApiError, { data: { email: string; password: string } }>({
+    mutationFn: ({ data }) => apiRequest<AuthResponse>("/admin/auth/login", {
+      method: "POST",
+      body: data,
+      auth: false,
     }),
   });
 }
 
-export function useListStaff(params: ListParams = {}) {
-  return useQuery<any>({
-    queryKey: ["/v1/staff", params],
-    queryFn: async () => {
-      const search = params.search?.trim();
-      const rows = search
-        ? staff.filter(
-            (member) =>
-              containsSearch(member.fullName, search) ||
-              containsSearch(member.email, search) ||
-              containsSearch(member.phoneNumber, search),
-          )
-        : staff;
+export function useGetDashboardSummary() {
+  return useQuery<DashboardSummary, ApiError>({
+    queryKey: ["/v1/admin/dashboard"],
+    queryFn: ({ signal }) => get<DashboardSummary>("/admin/dashboard", undefined, signal),
+  });
+}
 
-      return paginate(rows, params);
-    },
+export function useListStaff(params: ListParams = {}) {
+  return useQuery<PagedResult<StaffMember>, ApiError>({
+    queryKey: ["/v1/staff", params],
+    queryFn: ({ signal }) => get<PagedResult<StaffMember>>("/admin/staff", params, signal),
   });
 }
 
 export function useCreateStaff() {
-  return useMutation<any, Error, { data: Record<string, any> }>({
-    mutationFn: async ({ data }) => {
-      const member: StaffMember = {
-        id: nextStaffId++,
-        fullName: data.fullName,
-        email: data.email,
-        role: data.role,
-        phoneNumber: data.phoneNumber,
-        joinDate: data.joinDate,
-        isActive: true,
-      };
-      staff.unshift(member);
-      return member;
-    },
+  return useMutation<StaffMember, ApiError, { data: Record<string, unknown> }>({
+    mutationFn: ({ data }) => post<StaffMember>("/admin/staff", data),
   });
 }
 
 export function useUpdateStaff() {
-  return useMutation<any, Error, { id: number; data: Record<string, any> }>({
-    mutationFn: async ({ id, data }) => {
-      const member = staff.find((item) => item.id === id);
-      if (!member) throw new Error("Staff member not found.");
-      Object.assign(member, data);
-      return member;
-    },
+  return useMutation<StaffMember, ApiError, { id: Id; data: Record<string, unknown> }>({
+    mutationFn: ({ id, data }) => put<StaffMember>(`/admin/staff/${id}`, data),
   });
 }
 
 export function useDeleteStaff() {
-  return useMutation<void, Error, { id: number }>({
-    mutationFn: async ({ id }) => {
-      const index = staff.findIndex((item) => item.id === id);
-      if (index >= 0) staff.splice(index, 1);
-    },
+  return useMutation<void, ApiError, { id: Id }>({
+    mutationFn: ({ id }) => del(`/admin/staff/${id}`),
   });
 }
 
 export function useListVendors(params: ListParams = {}) {
-  return useQuery<any>({
+  return useQuery<PagedResult<Vendor>, ApiError>({
     queryKey: ["/v1/vendors", params],
-    queryFn: async () => {
-      refreshVendorCounts();
-      const search = params.search?.trim();
-      const rows = search
-        ? vendors.filter(
-            (vendor) =>
-              containsSearch(vendor.name, search) ||
-              containsSearch(vendor.contactPerson, search) ||
-              containsSearch(vendor.email, search) ||
-              containsSearch(vendor.phone, search),
-          )
-        : vendors;
-
-      return paginate(rows, params);
-    },
+    queryFn: ({ signal }) => get<PagedResult<Vendor>>("/admin/vendors", params, signal),
   });
 }
 
-export function useGetVendor({ id }: { id: number }) {
-  return useQuery<any>({
+export function useGetVendor({ id }: { id: Id }) {
+  return useQuery<VendorDetail | null, ApiError>({
     queryKey: ["/v1/vendors", id],
-    queryFn: async () => {
-      const vendor = vendors.find((item) => item.id === id);
-      if (!vendor) return null;
-      const vendorParts = parts.filter((part) => part.vendorId === id);
-      const invoices = purchaseInvoices.filter((invoice) => invoice.vendorId === id);
-
-      return {
-        ...vendor,
-        parts: vendorParts,
-        partsSuppliedCount: vendorParts.length,
-        purchaseInvoices: invoices,
-        totalPurchaseValue: invoices.reduce((sum, invoice) => sum + invoice.totalCost, 0),
-      };
-    },
+    enabled: Boolean(id),
+    queryFn: ({ signal }) => get<VendorDetail>(`/admin/vendors/${id}`, undefined, signal),
   });
 }
 
 export function useCreateVendor() {
-  return useMutation<any, Error, { data: Record<string, any> }>({
-    mutationFn: async ({ data }) => {
-      const vendor: Vendor = { id: nextVendorId++, name: data.name, ...data };
-      vendors.unshift(vendor);
-      return vendor;
-    },
+  return useMutation<Vendor, ApiError, { data: Record<string, unknown> }>({
+    mutationFn: ({ data }) => post<Vendor>("/admin/vendors", data),
   });
 }
 
 export function useUpdateVendor() {
-  return useMutation<any, Error, { id: number; data: Record<string, any> }>({
-    mutationFn: async ({ id, data }) => {
-      const vendor = vendors.find((item) => item.id === id);
-      if (!vendor) throw new Error("Vendor not found.");
-      Object.assign(vendor, data);
-      return vendor;
-    },
+  return useMutation<Vendor, ApiError, { id: Id; data: Record<string, unknown> }>({
+    mutationFn: ({ id, data }) => put<Vendor>(`/admin/vendors/${id}`, data),
   });
 }
 
 export function useDeleteVendor() {
-  return useMutation<void, Error, { id: number }>({
-    mutationFn: async ({ id }) => {
-      const index = vendors.findIndex((item) => item.id === id);
-      if (index >= 0) vendors.splice(index, 1);
-    },
+  return useMutation<void, ApiError, { id: Id }>({
+    mutationFn: ({ id }) => del(`/admin/vendors/${id}`),
   });
 }
 
 export function useListPartCategories() {
-  return useQuery<any>({
+  return useQuery<PartCategory[], ApiError>({
     queryKey: ["/v1/parts/categories"],
-    queryFn: async () => categories,
+    queryFn: ({ signal }) => get<PartCategory[]>("/admin/parts/categories", undefined, signal),
   });
 }
 
 export function useCreatePartCategory() {
-  return useMutation<any, Error, { data: { name: string } }>({
-    mutationFn: async ({ data }) => {
-      const category = { id: nextCategoryId++, name: data.name };
-      categories.push(category);
-      return category;
-    },
+  return useMutation<PartCategory, ApiError, { data: { name: string } }>({
+    mutationFn: ({ data }) => post<PartCategory>("/admin/parts/categories", data),
+  });
+}
+
+export function useDeletePartCategory() {
+  return useMutation<void, ApiError, { id: Id }>({
+    mutationFn: ({ id }) => del(`/admin/parts/categories/${id}`),
   });
 }
 
 export function useListParts(params: ListParams = {}) {
-  return useQuery<any>({
+  return useQuery<PartListResult, ApiError>({
     queryKey: ["/v1/parts", params],
-    queryFn: async () => {
-      const search = params.search?.trim();
-      let rows = search
-        ? parts.filter(
-            (part) =>
-              containsSearch(part.name, search) ||
-              containsSearch(part.partNumber, search) ||
-              containsSearch(part.categoryName, search),
-          )
-        : [...parts];
-
-      if (params.categoryId) {
-        rows = rows.filter((part) => part.categoryId === params.categoryId);
-      }
-
-      if (params.stockStatus === "in_stock") {
-        rows = rows.filter((part) => part.stockQuantity > part.reorderLevel);
-      } else if (params.stockStatus === "low_stock") {
-        rows = rows.filter((part) => part.stockQuantity > 0 && part.stockQuantity <= part.reorderLevel);
-      } else if (params.stockStatus === "out_of_stock") {
-        rows = rows.filter((part) => part.stockQuantity === 0);
-      }
-
-      return paginate(rows, params, {
-        lowStockCount: getLowStockRows().length,
-      });
-    },
+    queryFn: ({ signal }) => get<PartListResult>("/admin/parts", params, signal),
   });
 }
 
 export function useGetLowStockParts() {
-  return useQuery<any>({
+  return useQuery<LowStockPart[], ApiError>({
     queryKey: ["/v1/parts/low-stock"],
-    queryFn: async () => getLowStockRows(),
+    queryFn: ({ signal }) => get<LowStockPart[]>("/admin/parts/low-stock", undefined, signal),
   });
 }
 
 export function useCreatePart() {
-  return useMutation<any, Error, { data: Record<string, any> }>({
-    mutationFn: async ({ data }) => {
-      const category = categories.find((item) => item.id === data.categoryId);
-      const part: Part = {
-        id: nextPartId++,
-        name: data.name,
-        partNumber: data.partNumber,
-        categoryId: data.categoryId,
-        categoryName: category?.name ?? "Uncategorized",
-        description: data.description,
-        unitPrice: Number(data.unitPrice),
-        stockQuantity: Number(data.stockQuantity ?? 0),
-        reorderLevel: Number(data.reorderLevel ?? 0),
-        vendorId: data.vendorId,
-        vendorName: vendorName(data.vendorId),
-      };
-      parts.unshift(part);
-      return part;
-    },
+  return useMutation<Part, ApiError, { data: Record<string, unknown> }>({
+    mutationFn: ({ data }) => post<Part>("/admin/parts", data),
   });
 }
 
 export function useUpdatePart() {
-  return useMutation<any, Error, { id: number; data: Record<string, any> }>({
-    mutationFn: async ({ id, data }) => {
-      const part = parts.find((item) => item.id === id);
-      if (!part) throw new Error("Part not found.");
-      const category = categories.find((item) => item.id === data.categoryId);
-      Object.assign(part, {
-        ...data,
-        categoryName: category?.name ?? part.categoryName,
-        vendorName: vendorName(data.vendorId),
-      });
-      return part;
-    },
+  return useMutation<Part, ApiError, { id: Id; data: Record<string, unknown> }>({
+    mutationFn: ({ id, data }) => put<Part>(`/admin/parts/${id}`, data),
   });
 }
 
 export function useDeletePart() {
-  return useMutation<void, Error, { id: number }>({
-    mutationFn: async ({ id }) => {
-      const index = parts.findIndex((item) => item.id === id);
-      if (index >= 0) parts.splice(index, 1);
-    },
+  return useMutation<void, ApiError, { id: Id }>({
+    mutationFn: ({ id }) => del(`/admin/parts/${id}`),
+  });
+}
+
+export function useListPartRequests(params: ListParams & { status?: string } = {}) {
+  return useQuery<PagedResult<AdminPartRequest>, ApiError>({
+    queryKey: ["/v1/part-requests", params],
+    queryFn: ({ signal }) => get<PagedResult<AdminPartRequest>>("/admin/part-requests", params, signal),
+  });
+}
+
+export function useUpdatePartRequestStatus() {
+  return useMutation<AdminPartRequest, ApiError, { id: Id; data: { status: string } }>({
+    mutationFn: ({ id, data }) => put<AdminPartRequest>(`/admin/part-requests/${id}/status`, data),
   });
 }
 
 export function useListPurchaseInvoices(params: ListParams = {}) {
-  return useQuery<any>({
+  return useQuery<PagedResult<PurchaseInvoice>, ApiError>({
     queryKey: ["/v1/purchase-invoices", params],
-    queryFn: async () => {
-      const search = params.search?.trim();
-      const rows = search
-        ? purchaseInvoices.filter(
-            (invoice) =>
-              containsSearch(invoice.invoiceNumber, search) ||
-              containsSearch(invoice.vendorName, search),
-          )
-        : purchaseInvoices;
-
-      return paginate(rows, params, {
-        totalValue: rows.reduce((sum, invoice) => sum + invoice.totalCost, 0),
-      });
-    },
+    queryFn: ({ signal }) => get<PagedResult<PurchaseInvoice>>("/admin/purchase-invoices", params, signal),
   });
 }
 
-export function useGetPurchaseInvoice({ id }: { id: number }) {
-  return useQuery<any>({
+export function useGetPurchaseInvoice({ id }: { id: Id }) {
+  return useQuery<PurchaseInvoice | null, ApiError>({
     queryKey: ["/v1/purchase-invoices", id],
-    queryFn: async () => purchaseInvoices.find((invoice) => invoice.id === id) ?? null,
+    enabled: Boolean(id),
+    queryFn: ({ signal }) => get<PurchaseInvoice>(`/admin/purchase-invoices/${id}`, undefined, signal),
   });
 }
 
 export function useCreatePurchaseInvoice() {
-  return useMutation<any, Error, { data: Record<string, any> }>({
-    mutationFn: async ({ data }) => {
-      const vendor = vendors.find((item) => item.id === data.vendorId);
-      const lineItems = (data.lineItems as Array<{ partId: number; quantity: number; unitCost: number }>).map(
-        (item) => {
-          const part = parts.find((row) => row.id === item.partId);
-          const stockBefore = part?.stockQuantity ?? 0;
-          const stockAfter = stockBefore + item.quantity;
-          if (part) part.stockQuantity = stockAfter;
+  return useMutation<PurchaseInvoice, ApiError, { data: Record<string, unknown> }>({
+    mutationFn: ({ data }) => post<PurchaseInvoice>("/admin/purchase-invoices", data),
+  });
+}
 
-          return {
-            partId: item.partId,
-            partName: part?.name ?? "Unknown part",
-            quantity: item.quantity,
-            unitCost: item.unitCost,
-            subtotal: item.quantity * item.unitCost,
-            stockBefore,
-            stockAfter,
-          };
-        },
-      );
-      const totalCost = lineItems.reduce((sum, item) => sum + item.subtotal, 0);
-      const invoice: PurchaseInvoice = {
-        id: nextInvoiceId++,
-        invoiceNumber: `PI-2026-${String(nextInvoiceId).padStart(4, "0")}`,
-        vendorId: data.vendorId,
-        vendorName: vendor?.name ?? "Unknown vendor",
-        vendorPhone: vendor?.phone,
-        totalCost,
-        itemsCount: lineItems.length,
-        createdAt: new Date().toISOString(),
-        createdByName: "Local Admin",
-        notes: data.notes,
-        lineItems,
-      };
-      purchaseInvoices.unshift(invoice);
-      return invoice;
-    },
+export function useDeletePurchaseInvoice() {
+  return useMutation<void, ApiError, { id: Id }>({
+    mutationFn: ({ id }) => del(`/admin/purchase-invoices/${id}`),
   });
 }
 
 export function useGetFinancialReport(params: { period: string; date: string }) {
-  return useQuery<any>({
+  return useQuery<FinancialReport, ApiError>({
     queryKey: ["/v1/reports/financial", params],
-    queryFn: async () => {
-      const chartData = Array.from({ length: params.period === "monthly" ? 6 : 12 }, (_, index) => ({
-        date: params.period === "monthly" ? `Week ${index + 1}` : `M${index + 1}`,
-        revenue: 9000 + index * 1400,
-        invoiceCount: 8 + index,
-      }));
-
-      return {
-        summary: {
-          totalRevenue: chartData.reduce((sum, row) => sum + row.revenue, 0),
-          totalInvoices: chartData.reduce((sum, row) => sum + row.invoiceCount, 0),
-          averageInvoiceValue: 825.5,
-          netCashReceived: 64750,
-        },
-        chartData,
-        topParts: parts.map((part, index) => ({
-          partId: part.id,
-          partName: part.name,
-          totalSold: 35 - index * 4,
-          totalRevenue: part.unitPrice * (35 - index * 4),
-        })),
-        tableRows: chartData,
-      };
-    },
+    queryFn: ({ signal }) => get<FinancialReport>("/admin/reports/financial", params, signal),
   });
 }
 
 export function useListNotifications(params: ListParams = {}) {
-  return useQuery<any>({
+  return useQuery<PagedResult<NotificationItem>, ApiError>({
     queryKey: ["/v1/notifications", params],
-    queryFn: async () => {
-      const rows =
-        typeof params.isRead === "boolean"
-          ? notifications.filter((notification) => notification.isRead === params.isRead)
-          : notifications;
-
-      return paginate(rows, params, {
-        unreadCount: notifications.filter((notification) => !notification.isRead).length,
-      });
-    },
+    queryFn: ({ signal }) => get<PagedResult<NotificationItem>>("/admin/notifications", params, signal),
   });
 }
 
 export function useMarkNotificationRead() {
-  return useMutation<void, Error, { id: number }>({
-    mutationFn: async ({ id }) => {
-      const notification = notifications.find((item) => item.id === id);
-      if (notification) notification.isRead = true;
-    },
+  return useMutation<void, ApiError, { id: Id }>({
+    mutationFn: ({ id }) => post<void>(`/admin/notifications/${id}/read`),
   });
 }
 
 export function useMarkAllNotificationsRead() {
-  return useMutation<void, Error, void>({
-    mutationFn: async () => {
-      for (const notification of notifications) {
-        notification.isRead = true;
-      }
-    },
+  return useMutation<void, ApiError, void>({
+    mutationFn: () => post<void>("/admin/notifications/read-all"),
   });
 }
 
 export function useGetSettings() {
-  return useQuery<any>({
+  return useQuery<AdminSettings, ApiError>({
     queryKey: ["/v1/settings"],
-    queryFn: async () => settings,
+    queryFn: ({ signal }) => get<AdminSettings>("/admin/settings", undefined, signal),
   });
 }
 
 export function useUpdateSettings() {
-  return useMutation<any, Error, { data: Record<string, any> }>({
-    mutationFn: async ({ data }) => {
-      settings = { ...settings, ...data };
-      return settings;
-    },
+  return useMutation<AdminSettings, ApiError, { data: Record<string, unknown> }>({
+    mutationFn: ({ data }) => put<AdminSettings>("/admin/settings", data),
   });
 }
-
-void authTokenGetter;

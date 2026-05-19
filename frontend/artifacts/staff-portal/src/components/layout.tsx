@@ -9,6 +9,7 @@ import {
   BarChart3,
   Bell,
   LogOut,
+  PackageCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -16,6 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/sales/new", label: "New Sale", icon: ShoppingCart },
+  { href: "/orders", label: "Customer Orders", icon: PackageCheck },
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/invoices", label: "Invoices", icon: FileText },
   { href: "/search", label: "Search", icon: Search },

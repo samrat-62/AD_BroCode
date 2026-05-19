@@ -76,8 +76,13 @@ public sealed record CreateStaffSaleItemRequestDto(
     int Quantity);
 
 public sealed record SendStaffInvoiceEmailRequestDto(
+    [param: Required]
+    [param: EmailAddress]
     string To,
+
+    [param: StringLength(200)]
     string? Subject,
+
     string? Message);
 
 public sealed record StaffActionResultDto(

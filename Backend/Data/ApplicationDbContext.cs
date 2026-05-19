@@ -25,6 +25,8 @@ public sealed class ApplicationDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
 
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
+
     public DbSet<Customer> Customers => Set<Customer>();
 
     public DbSet<Staff> Staff => Set<Staff>();
@@ -123,6 +125,53 @@ public sealed class ApplicationDbContext : DbContext
                 .HasColumnType("timestamp with time zone")
                 .HasDefaultValueSql("now()")
                 .ValueGeneratedOnAdd()
+                .IsRequired();
+        });
+
+        modelBuilder.Entity<UserSession>(entity =>
+        {
+            entity.ToTable("UserSessions");
+
+            entity.HasKey(session => session.Id);
+
+            entity.Property(session => session.Id)
+                .ValueGeneratedOnAdd();
+
+            entity.Property(session => session.JwtId)
+                .HasColumnType("varchar(80)")
+                .HasMaxLength(80)
+                .IsRequired();
+
+            entity.HasIndex(session => session.JwtId)
+                .IsUnique();
+
+            entity.HasIndex(session => new { session.UserId, session.ExpiresAtUtc });
+
+            entity.Property(session => session.UserAgent)
+                .HasColumnType("varchar(500)")
+                .HasMaxLength(500);
+
+            entity.Property(session => session.IpAddress)
+                .HasColumnType("varchar(80)")
+                .HasMaxLength(80);
+
+            entity.Property(session => session.CreatedAt)
+                .HasColumnType("timestamp with time zone")
+                .HasDefaultValueSql("now()")
+                .ValueGeneratedOnAdd()
+                .IsRequired();
+
+            entity.Property(session => session.ExpiresAtUtc)
+                .HasColumnType("timestamp with time zone")
+                .IsRequired();
+
+            entity.Property(session => session.RevokedAt)
+                .HasColumnType("timestamp with time zone");
+
+            entity.HasOne(session => session.User)
+                .WithMany(user => user.Sessions)
+                .HasForeignKey(session => session.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
                 .IsRequired();
         });
 

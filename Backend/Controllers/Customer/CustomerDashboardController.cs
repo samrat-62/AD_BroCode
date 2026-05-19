@@ -139,7 +139,7 @@ public sealed class CustomerDashboardController : CustomerControllerBase
         return status switch
         {
             Models.Sales.OrderStatus.Processing => "processing",
-            Models.Sales.OrderStatus.Completed => "completed",
+            Models.Sales.OrderStatus.Completed => "delivered",
             Models.Sales.OrderStatus.Cancelled => "cancelled",
             _ => "pending"
         };
@@ -160,6 +160,7 @@ public sealed class CustomerDashboardController : CustomerControllerBase
     {
         return status switch
         {
+            PartRequestStatus.Acknowledged => "acknowledged",
             PartRequestStatus.Found => "found",
             PartRequestStatus.Unavailable => "unavailable",
             _ => "pending"

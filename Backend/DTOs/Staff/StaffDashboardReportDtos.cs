@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Backend.DTOs.Staff;
 
 public sealed record StaffDashboardStatsDto(
@@ -64,6 +66,11 @@ public sealed record StaffTopPartDto(
     int QuantitySold);
 
 public sealed record SendStaffCreditReminderRequestDto(
+    [param: Required]
+    [param: EmailAddress]
     string To,
+
+    [param: StringLength(200)]
     string? Subject,
+
     string? Message);

@@ -67,12 +67,30 @@ export default function ProfilePage() {
 
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const payload = {
+      ...profileForm,
+      dob: profileForm.dob ? profileForm.dob : null,
+    };
+
     updateCustomer.mutate(
-      { data: profileForm },
+      { data: payload },
       {
-        onSuccess: () => {
+        onSuccess: (updatedCustomer) => {
+          setProfileForm({
+            fullName: updatedCustomer.fullName || "",
+            phone: updatedCustomer.phone || "",
+            address: updatedCustomer.address || "",
+            dob: updatedCustomer.dob || ""
+          });
           queryClient.invalidateQueries({ queryKey: getGetCurrentCustomerQueryKey() });
           toast({ title: "Profile updated successfully" });
+        },
+        onError: (error) => {
+          toast({
+            title: "Profile update failed",
+            description: error.message,
+            variant: "destructive",
+          });
         }
       }
     );

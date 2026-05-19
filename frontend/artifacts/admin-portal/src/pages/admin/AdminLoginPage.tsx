@@ -1,14 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useAdminLogin } from "@workspace/api-client-react";
-import { useAuth } from "@/lib/auth";
+import { useLocation } from "wouter";
+import { isValidAdminToken, useAuth } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -17,7 +19,9 @@ const loginSchema = z.object({
 
 export default function AdminLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const { setToken } = useAuth();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const loginMutation = useAdminLogin();
 
@@ -26,16 +30,42 @@ export default function AdminLoginPage() {
     defaultValues: { email: "", password: "" },
   });
 
+  useEffect(() => {
+    const subscription = form.watch(() => {
+      if (loginError) {
+        setLoginError(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [form, loginError]);
+
   const onSubmit = (values: z.infer<typeof loginSchema>) => {
+    setLoginError(null);
+
     loginMutation.mutate({ data: values }, {
       onSuccess: (data) => {
+        if (data.role !== "Admin" || !isValidAdminToken(data.token)) {
+          setToken(null);
+          setLoginError("Admin access is required.");
+          toast({
+            title: "Login failed",
+            description: "Admin access is required.",
+            variant: "destructive",
+          });
+          return;
+        }
+
         setToken(data.token);
         toast({ title: "Login successful" });
+        setLocation("/admin/dashboard");
       },
       onError: (err) => {
+        const message = err.message || "Invalid email or password.";
+        setLoginError(message);
         toast({ 
           title: "Login failed", 
-          description: err.message || "Invalid credentials",
+          description: message,
           variant: "destructive"
         });
       }
@@ -60,6 +90,13 @@ export default function AdminLoginPage() {
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              {loginError ? (
+                <Alert variant="destructive" data-testid="login-error">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{loginError}</AlertDescription>
+                </Alert>
+              ) : null}
+
               <FormField
                 control={form.control}
                 name="email"

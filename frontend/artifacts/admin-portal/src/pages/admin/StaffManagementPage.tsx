@@ -21,9 +21,9 @@ export default function StaffManagementPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showDialog, setShowDialog] = useState(false);
-  const [editId, setEditId] = useState<number | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<StaffForm>(emptyForm);
-  const [deleting, setDeleting] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const { data, isLoading } = useListStaff({ search: search || undefined, page, limit: 15 });
   const { data: allStaff } = useListStaff({ limit: 200 });
@@ -54,7 +54,7 @@ export default function StaffManagementPage() {
     }
   }
 
-  async function handleDelete(id: number) {
+  async function handleDelete(id: string) {
     try {
       await deleteMut.mutateAsync({ id });
       toast.success("Staff member deleted");

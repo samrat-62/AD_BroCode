@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, Plus, Trash2, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 
-type LineItem = { partId: number; partName: string; quantity: number; unitCost: number };
+type LineItem = { partId: string; partName: string; quantity: number; unitCost: number };
 
 export default function PurchaseInvoiceNewPage() {
   const [, setLocation] = useLocation();
@@ -33,7 +33,7 @@ export default function PurchaseInvoiceNewPage() {
   const totalCost = lineItems.reduce((sum, item) => sum + item.quantity * item.unitCost, 0);
 
   function addLineItem() {
-    const part = parts.find(p => p.id === parseInt(selectedPartId));
+    const part = parts.find(p => p.id === selectedPartId);
     if (!part) { toast.error("Select a part first"); return; }
     if (!qty || parseInt(qty) < 1) { toast.error("Quantity must be at least 1"); return; }
     if (!cost || parseFloat(cost) <= 0) { toast.error("Enter a valid unit cost"); return; }
@@ -60,7 +60,7 @@ export default function PurchaseInvoiceNewPage() {
     try {
       const result = await createMut.mutateAsync({
         data: {
-          vendorId: parseInt(vendorId),
+          vendorId,
           lineItems: lineItems.map(l => ({ partId: l.partId, quantity: l.quantity, unitCost: l.unitCost })),
           notes: notes || undefined,
         }
@@ -117,7 +117,7 @@ export default function PurchaseInvoiceNewPage() {
                   <Label>Part</Label>
                   <Select value={selectedPartId} onValueChange={v => {
                     setSelectedPartId(v);
-                    const p = parts.find(pt => pt.id === parseInt(v));
+                    const p = parts.find(pt => pt.id === v);
                     if (p) setCost(String(p.unitPrice));
                   }}>
                     <SelectTrigger><SelectValue placeholder="Search part..." /></SelectTrigger>

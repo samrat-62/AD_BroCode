@@ -185,7 +185,7 @@ public sealed class StaffCustomersController : StaffControllerBase
     }
 
     [HttpGet("customers/{id:guid}/purchases")]
-    public async Task<ActionResult<IReadOnlyList<StaffInvoiceSummaryDto>>> GetCustomerPurchases(
+    public async Task<ActionResult<IReadOnlyList<StaffCustomerPurchaseDto>>> GetCustomerPurchases(
         Guid id,
         CancellationToken cancellationToken)
     {
@@ -198,7 +198,39 @@ public sealed class StaffCustomersController : StaffControllerBase
             .OrderByDescending(invoice => invoice.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        return Ok(invoices.Select(StaffDtoMapper.ToInvoiceSummaryDto).ToList());
+        var orders = await _dbContext.Orders
+            .Include(order => order.Customer)
+            .ThenInclude(customer => customer.User)
+            .AsNoTracking()
+            .Where(order => order.CustomerId == id)
+            .OrderByDescending(order => order.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        var purchases = invoices
+            .Select(invoice => new StaffCustomerPurchaseDto(
+                invoice.Id,
+                "invoice",
+                invoice.InvoiceNumber,
+                StaffDtoMapper.ToInvoiceStatus(invoice.Status),
+                StaffDtoMapper.ToPaymentMethod(invoice.PaymentMethod),
+                invoice.Total,
+                invoice.CreatedAt,
+                invoice.StaffName,
+                invoice.Vehicle?.Plate))
+            .Concat(orders.Select(order => new StaffCustomerPurchaseDto(
+                order.Id,
+                "order",
+                order.OrderNumber,
+                StaffOrdersController.ToStatusString(order.Status),
+                StaffOrdersController.ToPaymentMethodString(order.PaymentMethod),
+                order.Total,
+                order.CreatedAt,
+                "Customer Portal",
+                null)))
+            .OrderByDescending(purchase => purchase.CreatedAt)
+            .ToList();
+
+        return Ok(purchases);
     }
 
     [HttpGet("customers/{id:guid}/services")]

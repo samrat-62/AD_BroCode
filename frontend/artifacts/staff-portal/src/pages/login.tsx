@@ -34,7 +34,7 @@ export default function Login() {
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "staff@autopartspro.com",
+      email: "admin@autoparts.com",
       password: "password123",
     },
   });
@@ -84,7 +84,7 @@ export default function Login() {
                     <FormLabel className="text-slate-300">Email Address</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="staff@autopartspro.com"
+                        placeholder="admin@autoparts.com"
                         className="bg-[#0A111E] border-[#1C2C42] text-white placeholder:text-slate-600 focus-visible:ring-[#FF6B00]"
                         {...field}
                       />

@@ -23,6 +23,8 @@ public sealed class User
 
     public Staff? Staff { get; set; }
 
+    public ICollection<UserSession> Sessions { get; set; } = new List<UserSession>();
+
     public ICollection<CustomerNote> AuthoredCustomerNotes { get; set; } = new List<CustomerNote>();
 
     public ICollection<UserNotification> Notifications { get; set; } = new List<UserNotification>();

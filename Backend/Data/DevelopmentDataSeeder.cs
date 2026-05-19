@@ -18,7 +18,6 @@ public static class DevelopmentDataSeeder
         var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
 
         await SeedAdminUser(dbContext, configuration);
-        await SeedStaffUser(dbContext, configuration);
         await SeedAdminSettings(dbContext);
     }
 
@@ -48,57 +47,6 @@ public static class DevelopmentDataSeeder
             IsActive = true
         });
 
-        await dbContext.SaveChangesAsync();
-    }
-
-    private static async Task SeedStaffUser(
-        ApplicationDbContext dbContext,
-        IConfiguration configuration)
-    {
-        var email = (configuration["StaffSeed:Email"] ?? "staff@autoparts.com")
-            .Trim()
-            .ToLowerInvariant();
-        var password = configuration["StaffSeed:Password"] ?? "password123";
-        var fullName = configuration["StaffSeed:FullName"] ?? "Staff User";
-
-        var user = await dbContext.Users
-            .Include(item => item.Staff)
-            .SingleOrDefaultAsync(item => item.Email == email);
-
-        if (user is not null)
-        {
-            if (user.Staff is null)
-            {
-                dbContext.Staff.Add(new Staff
-                {
-                    UserId = user.Id,
-                    StaffRole = StaffRole.SalesStaff,
-                    JoinDate = DateOnly.FromDateTime(DateTime.UtcNow),
-                    IsActive = true
-                });
-
-                await dbContext.SaveChangesAsync();
-            }
-
-            return;
-        }
-
-        user = new User
-        {
-            FullName = fullName,
-            Email = email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
-            Role = UserRole.Staff,
-            IsActive = true,
-            Staff = new Staff
-            {
-                StaffRole = StaffRole.SalesStaff,
-                JoinDate = DateOnly.FromDateTime(DateTime.UtcNow),
-                IsActive = true
-            }
-        };
-
-        dbContext.Users.Add(user);
         await dbContext.SaveChangesAsync();
     }
 

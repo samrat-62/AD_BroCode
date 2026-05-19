@@ -15,6 +15,7 @@ export default function HistoryPage() {
 
   const getOrderStatusBadge = (status: string) => {
     switch (status) {
+      case 'delivered': return <Badge variant="default" className="bg-green-500">Delivered</Badge>;
       case 'completed': return <Badge variant="default" className="bg-green-500">Completed</Badge>;
       case 'processing': return <Badge variant="secondary" className="bg-amber-500/20 text-amber-600 border-amber-500/20">Processing</Badge>;
       case 'cancelled': return <Badge variant="destructive">Cancelled</Badge>;

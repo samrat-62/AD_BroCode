@@ -5,6 +5,7 @@ using Backend.Data;
 using Backend.DTOs.Auth;
 using Backend.Models.Customers;
 using Backend.Models.Users;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
@@ -14,14 +15,20 @@ namespace Backend.Services.Auth;
 public sealed class AuthService : IAuthService
 {
     private const int DefaultTokenExpiryMinutes = 60;
+    private const string SessionIdClaimType = "sid";
 
     private readonly ApplicationDbContext _dbContext;
     private readonly IConfiguration _configuration;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public AuthService(ApplicationDbContext dbContext, IConfiguration configuration)
+    public AuthService(
+        ApplicationDbContext dbContext,
+        IConfiguration configuration,
+        IHttpContextAccessor httpContextAccessor)
     {
         _dbContext = dbContext;
         _configuration = configuration;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<AuthResult> SignUpAsync(SignUpRequestDto request, CancellationToken cancellationToken)
@@ -64,7 +71,7 @@ public sealed class AuthService : IAuthService
             return AuthResult.EmailAlreadyExists();
         }
 
-        return AuthResult.Success(CreateAuthResponse(user));
+        return AuthResult.Success(await CreateAuthResponseAsync(user, cancellationToken));
     }
 
     public async Task<AuthResult> LoginAsync(LoginRequestDto request, CancellationToken cancellationToken)
@@ -84,13 +91,27 @@ public sealed class AuthService : IAuthService
             return AuthResult.InactiveUser();
         }
 
-        return AuthResult.Success(CreateAuthResponse(user));
+        return AuthResult.Success(await CreateAuthResponseAsync(user, cancellationToken));
     }
 
-    private AuthResponseDto CreateAuthResponse(User user)
+    private async Task<AuthResponseDto> CreateAuthResponseAsync(
+        User user,
+        CancellationToken cancellationToken)
     {
         var expiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(GetTokenExpiryMinutes());
-        var token = GenerateJwtToken(user, expiresAtUtc);
+        var session = new UserSession
+        {
+            UserId = user.Id,
+            JwtId = Guid.NewGuid().ToString("N"),
+            UserAgent = NormalizeOptional(_httpContextAccessor.HttpContext?.Request.Headers.UserAgent.ToString(), 500),
+            IpAddress = NormalizeOptional(_httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString(), 80),
+            ExpiresAtUtc = expiresAtUtc
+        };
+
+        _dbContext.UserSessions.Add(session);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var token = GenerateJwtToken(user, session, expiresAtUtc);
 
         return new AuthResponseDto(
             user.Id,
@@ -98,11 +119,15 @@ public sealed class AuthService : IAuthService
             user.Email,
             user.Role.ToString(),
             user.IsActive,
+            session.Id,
             token,
             expiresAtUtc);
     }
 
-    private string GenerateJwtToken(User user, DateTimeOffset expiresAtUtc)
+    private string GenerateJwtToken(
+        User user,
+        UserSession session,
+        DateTimeOffset expiresAtUtc)
     {
         var key = GetRequiredJwtSetting("Key");
         var issuer = GetRequiredJwtSetting("Issuer");
@@ -115,7 +140,8 @@ public sealed class AuthService : IAuthService
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, user.Email),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new Claim(JwtRegisteredClaimNames.Jti, session.JwtId),
+            new Claim(SessionIdClaimType, session.Id.ToString()),
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Name, user.FullName),
             new Claim(ClaimTypes.Email, user.Email),
@@ -148,6 +174,17 @@ public sealed class AuthService : IAuthService
     private static string NormalizeEmail(string email)
     {
         return email.Trim().ToLowerInvariant();
+    }
+
+    private static string? NormalizeOptional(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var trimmed = value.Trim();
+        return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength];
     }
 
     private static bool IsUniqueViolation(DbUpdateException exception)

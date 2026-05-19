@@ -1,10 +1,8 @@
-using Backend.Data;
 using Backend.DTOs.Auth;
 using Backend.Models.Users;
 using Backend.Services.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Controllers.Admin;
 
@@ -14,12 +12,10 @@ namespace Backend.Controllers.Admin;
 public sealed class AdminAuthController : ControllerBase
 {
     private readonly IAuthService _authService;
-    private readonly ApplicationDbContext _dbContext;
 
-    public AdminAuthController(IAuthService authService, ApplicationDbContext dbContext)
+    public AdminAuthController(IAuthService authService)
     {
         _authService = authService;
-        _dbContext = dbContext;
     }
 
     [HttpPost("login")]
@@ -44,22 +40,9 @@ public sealed class AdminAuthController : ControllerBase
             return BadRequest(new { message = "Unable to log in." });
         }
 
-        if (result.Response.Role == UserRole.Customer.ToString())
+        if (result.Response.Role != UserRole.Admin.ToString())
         {
             return StatusCode(StatusCodes.Status403Forbidden, new { message = "Admin access is required." });
-        }
-
-        if (result.Response.Role == UserRole.Staff.ToString())
-        {
-            var staffIsActive = await _dbContext.Staff
-                .AnyAsync(
-                    staff => staff.UserId == result.Response.Id && staff.IsActive,
-                    cancellationToken);
-
-            if (!staffIsActive)
-            {
-                return StatusCode(StatusCodes.Status403Forbidden, new { message = "Staff account is inactive." });
-            }
         }
 
         return Ok(result.Response);

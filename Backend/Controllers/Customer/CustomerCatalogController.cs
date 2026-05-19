@@ -1,10 +1,12 @@
 using Backend.Data;
 using Backend.DTOs.Customer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Controllers.Customer;
 
+[AllowAnonymous]
 [Route("api")]
 public sealed class CustomerCatalogController : CustomerControllerBase
 {

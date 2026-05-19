@@ -60,6 +60,7 @@ export default function RequestsPage() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case 'acknowledged': return <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-500/20">Acknowledged</Badge>;
       case 'found': return <Badge variant="default" className="bg-green-500 hover:bg-green-600">Found</Badge>;
       case 'unavailable': return <Badge variant="destructive">Unavailable</Badge>;
       default: return <Badge variant="secondary">Pending Review</Badge>;

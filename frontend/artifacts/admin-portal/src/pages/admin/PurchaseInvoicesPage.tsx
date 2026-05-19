@@ -1,20 +1,41 @@
 import { useState } from "react";
-import { useListPurchaseInvoices } from "@workspace/api-client-react";
+import { useListPurchaseInvoices, useDeletePurchaseInvoice } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileText, Plus, Search, DollarSign, Eye } from "lucide-react";
+import { FileText, Plus, Search, DollarSign, Eye, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function PurchaseInvoicesPage() {
   const [, setLocation] = useLocation();
+  const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const { data, isLoading } = useListPurchaseInvoices({ search: search || undefined, page, limit: 20 });
+  const deleteMut = useDeletePurchaseInvoice();
   const invoices = (data?.data ?? []) as any[];
+
+  async function handleDelete(id: string) {
+    try {
+      await deleteMut.mutateAsync({ id });
+      toast.success("Purchase invoice deleted");
+      qc.invalidateQueries({ queryKey: ["/v1/purchase-invoices"] });
+      qc.invalidateQueries({ queryKey: ["/v1/parts"] });
+      qc.invalidateQueries({ queryKey: ["/v1/admin/dashboard"] });
+      qc.invalidateQueries({ queryKey: ["/v1/notifications"] });
+    } catch (e: any) {
+      toast.error(e?.data?.message ?? e?.message ?? "Failed to delete invoice");
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -82,9 +103,19 @@ export default function PurchaseInvoicesPage() {
                     <TableCell className="text-right font-semibold">${inv.totalCost.toFixed(2)}</TableCell>
                     <TableCell className="text-muted-foreground">{new Date(inv.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right" onClick={e => e.stopPropagation()}>
-                      <Button size="icon" variant="ghost" onClick={() => setLocation(`/admin/purchase-invoices/${inv.id}`)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button size="icon" variant="ghost" onClick={() => setLocation(`/admin/purchase-invoices/${inv.id}`)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setDeleting(inv.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -105,6 +136,21 @@ export default function PurchaseInvoicesPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={deleting !== null} onOpenChange={() => setDeleting(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Delete Purchase Invoice?</DialogTitle></DialogHeader>
+          <p className="text-muted-foreground text-sm">
+            This will reverse the stock added by the invoice and remove the invoice record.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleting(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => deleting && handleDelete(deleting)} disabled={deleteMut.isPending}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

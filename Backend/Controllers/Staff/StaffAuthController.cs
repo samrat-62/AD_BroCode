@@ -53,6 +53,7 @@ public sealed class StaffAuthController : ControllerBase
         {
             return Ok(new StaffSessionDto(
                 result.Response.Token,
+                result.Response.SessionId,
                 new StaffDto(
                     result.Response.Id,
                     result.Response.FullName,
@@ -72,6 +73,9 @@ public sealed class StaffAuthController : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden, new { message = "Staff account is inactive." });
         }
 
-        return Ok(new StaffSessionDto(result.Response.Token, StaffDtoMapper.ToStaffDto(staff)));
+        return Ok(new StaffSessionDto(
+            result.Response.Token,
+            result.Response.SessionId,
+            StaffDtoMapper.ToStaffDto(staff)));
     }
 }

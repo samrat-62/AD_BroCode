@@ -10,6 +10,7 @@ import Customers from "@/pages/customers";
 import CustomerNew from "@/pages/customer-new";
 import CustomerProfile from "@/pages/customer-profile";
 import SalesNew from "@/pages/sales-new";
+import Orders from "@/pages/orders";
 import Invoices from "@/pages/invoices";
 import InvoiceView from "@/pages/invoice-view";
 import Search from "@/pages/search";
@@ -51,6 +52,9 @@ export default function App() {
         </Route>
         <Route path="/sales/new">
           <ProtectedRoute component={SalesNew} />
+        </Route>
+        <Route path="/orders">
+          <ProtectedRoute component={Orders} />
         </Route>
         <Route path="/invoices">
           <ProtectedRoute component={Invoices} />

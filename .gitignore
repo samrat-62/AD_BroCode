@@ -67,6 +67,7 @@ project.fragment.lock.json
 frontend/artifacts/*/dev-server.*.log
 frontend/artifacts/*/dist/
 frontend/artifacts/*/.replit-artifact/
+Backend/.api-test/
 .replit
 replit.nix
 

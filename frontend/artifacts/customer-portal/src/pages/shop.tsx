@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useListParts, useListPartCategories, useCreateOrder, getListOrdersQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,11 +9,27 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, ShoppingCart, Filter, Plus, Minus, X, Box, CheckCircle2 } from "lucide-react";
+import { Search, ShoppingCart, Filter, Plus, Minus, X, Box, CheckCircle2, CreditCard, Wallet, Banknote } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { formatCurrency } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+
+type DeliveryType = "pickup" | "delivery";
+type PaymentMethod = "cash" | "cash_on_delivery" | "card" | "credit";
+
+const paymentOptions: Record<DeliveryType, Array<{ value: PaymentMethod; label: string; description: string; icon: React.ElementType }>> = {
+  pickup: [
+    { value: "cash", label: "Pay at Workshop", description: "Pay when you collect your order.", icon: Wallet },
+    { value: "card", label: "Card", description: "Pay by debit or credit card.", icon: CreditCard },
+    { value: "credit", label: "Credit", description: "Add this order to your credit account.", icon: Banknote },
+  ],
+  delivery: [
+    { value: "cash_on_delivery", label: "Cash on Delivery", description: "Pay when the order arrives.", icon: Wallet },
+    { value: "card", label: "Card", description: "Pay by debit or credit card.", icon: CreditCard },
+    { value: "credit", label: "Credit", description: "Add this order to your credit account.", icon: Banknote },
+  ],
+};
 
 export default function ShopPage() {
   const [search, setSearch] = useState("");
@@ -21,7 +37,8 @@ export default function ShopPage() {
   const [inStock, setInStock] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckout, setIsCheckout] = useState(false);
-  const [deliveryType, setDeliveryType] = useState<"pickup" | "delivery">("pickup");
+  const [deliveryType, setDeliveryType] = useState<DeliveryType>("pickup");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
 
   const { data: parts, isLoading } = useListParts({ 
     search: search || undefined, 
@@ -36,6 +53,10 @@ export default function ShopPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  useEffect(() => {
+    setPaymentMethod(paymentOptions[deliveryType][0].value);
+  }, [deliveryType]);
+
   const handleCheckout = () => {
     if (items.length === 0) return;
 
@@ -44,7 +65,7 @@ export default function ShopPage() {
         data: {
           items: items.map(i => ({ partId: i.partId, quantity: i.quantity })),
           deliveryType,
-          paymentMethod: "cash_on_delivery" // Default for demo
+          paymentMethod
         }
       },
       {
@@ -153,7 +174,7 @@ export default function ShopPage() {
               <SheetHeader>
                 <SheetTitle>{isCheckout ? "Checkout" : "Your Cart"}</SheetTitle>
                 <SheetDescription>
-                  {isCheckout ? "Review your order and select delivery method." : `You have ${itemCount} items in your cart.`}
+                  {isCheckout ? "Review your order and choose delivery and payment." : `You have ${itemCount} items in your cart.`}
                 </SheetDescription>
               </SheetHeader>
               
@@ -203,28 +224,56 @@ export default function ShopPage() {
                 )}
 
                 {isCheckout && items.length > 0 && (
-                  <div className="mt-8 space-y-4">
-                    <h3 className="font-semibold text-lg border-b pb-2">Delivery Method</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div 
-                        className={`border rounded-lg p-4 cursor-pointer flex flex-col items-center gap-2 transition-colors ${deliveryType === 'pickup' ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/50'}`}
-                        onClick={() => setDeliveryType("pickup")}
-                      >
-                        <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center mb-2">
-                          <CheckCircle2 className={`h-5 w-5 ${deliveryType === 'pickup' ? 'text-primary' : 'text-transparent'}`} />
+                  <div className="mt-8 space-y-6">
+                    <div className="space-y-4">
+                      <h3 className="font-semibold text-lg border-b pb-2">Delivery Method</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div
+                          className={`border rounded-lg p-4 cursor-pointer flex flex-col items-center gap-2 transition-colors ${deliveryType === 'pickup' ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/50'}`}
+                          onClick={() => setDeliveryType("pickup")}
+                        >
+                          <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center mb-2">
+                            <CheckCircle2 className={`h-5 w-5 ${deliveryType === 'pickup' ? 'text-primary' : 'text-transparent'}`} />
+                          </div>
+                          <span className="font-medium">Workshop Pickup</span>
+                          <span className="text-xs text-muted-foreground text-center">Collect your items directly from our workshop.</span>
                         </div>
-                        <span className="font-medium">Workshop Pickup</span>
-                        <span className="text-xs text-muted-foreground text-center">Collect your items directly from our workshop.</span>
+                        <div
+                          className={`border rounded-lg p-4 cursor-pointer flex flex-col items-center gap-2 transition-colors ${deliveryType === 'delivery' ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/50'}`}
+                          onClick={() => setDeliveryType("delivery")}
+                        >
+                          <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center mb-2">
+                            <CheckCircle2 className={`h-5 w-5 ${deliveryType === 'delivery' ? 'text-primary' : 'text-transparent'}`} />
+                          </div>
+                          <span className="font-medium">Home Delivery</span>
+                          <span className="text-xs text-muted-foreground text-center">Fast delivery to your registered address.</span>
+                        </div>
                       </div>
-                      <div 
-                        className={`border rounded-lg p-4 cursor-pointer flex flex-col items-center gap-2 transition-colors ${deliveryType === 'delivery' ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/50'}`}
-                        onClick={() => setDeliveryType("delivery")}
-                      >
-                        <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center mb-2">
-                          <CheckCircle2 className={`h-5 w-5 ${deliveryType === 'delivery' ? 'text-primary' : 'text-transparent'}`} />
-                        </div>
-                        <span className="font-medium">Home Delivery</span>
-                        <span className="text-xs text-muted-foreground text-center">Fast delivery to your registered address.</span>
+                    </div>
+                    <div className="space-y-4">
+                      <h3 className="font-semibold text-lg border-b pb-2">Payment Method</h3>
+                      <div className="grid gap-3">
+                        {paymentOptions[deliveryType].map(option => {
+                          const Icon = option.icon;
+                          const selected = paymentMethod === option.value;
+                          return (
+                            <button
+                              type="button"
+                              key={option.value}
+                              className={`w-full border rounded-lg p-3 text-left flex items-center gap-3 transition-colors ${selected ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/50'}`}
+                              onClick={() => setPaymentMethod(option.value)}
+                            >
+                              <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <Icon className={`h-4 w-4 ${selected ? 'text-primary' : 'text-muted-foreground'}`} />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="font-medium">{option.label}</div>
+                                <div className="text-xs text-muted-foreground">{option.description}</div>
+                              </div>
+                              <CheckCircle2 className={`h-5 w-5 shrink-0 ${selected ? 'text-primary' : 'text-transparent'}`} />
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -253,7 +302,7 @@ export default function ShopPage() {
                   
                   {isCheckout ? (
                     <Button className="w-full" size="lg" onClick={handleCheckout} disabled={createOrder.isPending}>
-                      {createOrder.isPending ? "Processing..." : `Pay ${formatCurrency(total)}`}
+                      {createOrder.isPending ? "Processing..." : paymentMethod === "card" ? `Pay ${formatCurrency(total)}` : "Place Order"}
                     </Button>
                   ) : (
                     <Button className="w-full" size="lg" onClick={() => setIsCheckout(true)}>

@@ -2,18 +2,27 @@ using Backend.Data;
 using Backend.DTOs.Staff;
 using Backend.Models.Credits;
 using Backend.Models.Sales;
+using Backend.Services.Email;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Backend.Controllers.Staff;
 
 public sealed class StaffReportsController : StaffControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly IEmailService _emailService;
+    private readonly ILogger<StaffReportsController> _logger;
 
-    public StaffReportsController(ApplicationDbContext dbContext)
+    public StaffReportsController(
+        ApplicationDbContext dbContext,
+        IEmailService emailService,
+        ILogger<StaffReportsController> logger)
     {
         _dbContext = dbContext;
+        _emailService = emailService;
+        _logger = logger;
     }
 
     [HttpGet("reports/regular-customers")]
@@ -161,8 +170,44 @@ public sealed class StaffReportsController : StaffControllerBase
     }
 
     [HttpPost("reports/credit-reminders")]
-    public ActionResult<StaffActionResultDto> SendCreditReminder(SendStaffCreditReminderRequestDto request)
+    public async Task<ActionResult<StaffActionResultDto>> SendCreditReminder(
+        SendStaffCreditReminderRequestDto request,
+        CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(request.To))
+        {
+            return BadRequest(new { message = "Recipient email is required." });
+        }
+
+        var subject = string.IsNullOrWhiteSpace(request.Subject)
+            ? "Credit payment reminder"
+            : request.Subject.Trim();
+        var message = string.IsNullOrWhiteSpace(request.Message)
+            ? "This is a reminder for your pending credit payment."
+            : request.Message.Trim();
+
+        try
+        {
+            await _emailService.SendEmailAsync(
+                new EmailMessage(request.To, subject, message),
+                cancellationToken);
+        }
+        catch (Exception exception) when (IsEmailFailure(exception))
+        {
+            _logger.LogError(exception, "Failed to send credit reminder email.");
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                new { message = "Credit reminder email could not be sent. Check SMTP configuration." });
+        }
+
         return Ok(new StaffActionResultDto(Guid.Empty, request.To, DateTimeOffset.UtcNow));
+    }
+
+    private static bool IsEmailFailure(Exception exception)
+    {
+        return exception is EmailSendException
+            or InvalidOperationException
+            or ArgumentException
+            or OptionsValidationException;
     }
 }

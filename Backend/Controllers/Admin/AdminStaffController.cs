@@ -2,12 +2,14 @@ using Backend.Data;
 using Backend.DTOs.Admin.Common;
 using Backend.DTOs.Admin.Staff;
 using Backend.Models.Users;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 namespace Backend.Controllers.Admin;
 
+[Authorize(Roles = "Admin")]
 public sealed class AdminStaffController : AdminControllerBase
 {
     private readonly ApplicationDbContext _dbContext;

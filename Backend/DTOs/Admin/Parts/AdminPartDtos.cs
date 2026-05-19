@@ -61,4 +61,5 @@ public sealed record UpsertAdminPartRequestDto(
     [param: Range(0, int.MaxValue)]
     int ReorderLevel,
 
-    Guid? VendorId);
+    [param: Required]
+    Guid VendorId);

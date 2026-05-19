@@ -11,6 +11,7 @@ public sealed record StaffDto(
 
 public sealed record StaffSessionDto(
     string Token,
+    Guid SessionId,
     StaffDto Staff);
 
 public sealed record StaffLoginRequestDto(

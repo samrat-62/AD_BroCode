@@ -18,7 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Mail, Phone, MapPin, CreditCard, ShoppingCart, Car, Plus, FileText, Send, Calendar, Clock } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, CreditCard, ShoppingCart, Car, Plus, FileText, Send, Calendar, Clock, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetCustomerNotesQueryKey } from "@workspace/api-client-react";
@@ -180,8 +180,10 @@ export default function CustomerProfile() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Date</TableHead>
-                        <TableHead>Invoice #</TableHead>
+                        <TableHead>Reference</TableHead>
+                        <TableHead>Type</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Payment</TableHead>
                         <TableHead className="text-right">Total</TableHead>
                         <TableHead></TableHead>
                       </TableRow>
@@ -190,13 +192,19 @@ export default function CustomerProfile() {
                       {purchases.map(p => (
                         <TableRow key={p.id}>
                           <TableCell>{formatDateTime(p.createdAt)}</TableCell>
-                          <TableCell className="font-mono">{p.invoiceNumber}</TableCell>
+                          <TableCell className="font-mono">{p.referenceNumber}</TableCell>
+                          <TableCell><Badge variant="secondary" className="capitalize">{p.source}</Badge></TableCell>
                           <TableCell><Badge variant="outline">{p.status}</Badge></TableCell>
+                          <TableCell className="capitalize">{p.paymentMethod.replaceAll("_", " ")}</TableCell>
                           <TableCell className="text-right font-medium">{formatCurrency(p.total)}</TableCell>
                           <TableCell className="text-right">
-                            <Link href={`/invoices/${p.id}`}>
-                              <Button variant="ghost" size="sm">View</Button>
-                            </Link>
+                            {p.source === "invoice" ? (
+                              <Link href={`/invoices/${p.id}`}>
+                                <Button variant="ghost" size="sm">View</Button>
+                              </Link>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Customer order</span>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -329,6 +337,3 @@ export default function CustomerProfile() {
     </div>
   );
 }
-
-// Ensure lucide icon is imported for the button above. Adding it here for completeness since we used it.
-import { DollarSign } from "lucide-react";

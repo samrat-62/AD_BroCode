@@ -1,18 +1,41 @@
 import { useRoute, useLocation } from "wouter";
-import { useGetPurchaseInvoice } from "@workspace/api-client-react";
+import { useGetPurchaseInvoice, useDeletePurchaseInvoice } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Printer, Building2, Calendar, User, FileText } from "lucide-react";
+import { ArrowLeft, Printer, Building2, Calendar, User, FileText, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function PurchaseInvoiceDetailPage() {
   const [, params] = useRoute("/admin/purchase-invoices/:id");
   const [, setLocation] = useLocation();
-  const id = params ? parseInt(params.id) : 0;
+  const qc = useQueryClient();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const id = params?.id ?? "";
   const { data: invoice, isLoading } = useGetPurchaseInvoice({ id });
+  const deleteMut = useDeletePurchaseInvoice();
+
+  async function handleDelete() {
+    if (!id) return;
+
+    try {
+      await deleteMut.mutateAsync({ id });
+      toast.success("Purchase invoice deleted");
+      qc.invalidateQueries({ queryKey: ["/v1/purchase-invoices"] });
+      qc.invalidateQueries({ queryKey: ["/v1/parts"] });
+      qc.invalidateQueries({ queryKey: ["/v1/admin/dashboard"] });
+      qc.invalidateQueries({ queryKey: ["/v1/notifications"] });
+      setLocation("/admin/purchase-invoices");
+    } catch (e: any) {
+      toast.error(e?.data?.message ?? e?.message ?? "Failed to delete invoice");
+    }
+  }
 
   if (isLoading) {
     return (
@@ -48,9 +71,14 @@ export default function PurchaseInvoiceDetailPage() {
             <p className="text-muted-foreground text-sm">Purchase Invoice Detail</p>
           </div>
         </div>
-        <Button variant="outline" onClick={() => window.print()}>
-          <Printer className="h-4 w-4 mr-2" /> Print
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => window.print()}>
+            <Printer className="h-4 w-4 mr-2" /> Print
+          </Button>
+          <Button variant="destructive" onClick={() => setConfirmDelete(true)}>
+            <Trash2 className="h-4 w-4 mr-2" /> Delete
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -148,6 +176,19 @@ export default function PurchaseInvoiceDetailPage() {
           </Card>
         </div>
       </div>
+
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Delete Purchase Invoice?</DialogTitle></DialogHeader>
+          <p className="text-muted-foreground text-sm">
+            This will reverse the stock added by the invoice and remove the invoice record.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDelete(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleteMut.isPending}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

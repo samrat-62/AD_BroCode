@@ -8,6 +8,7 @@ import AdminLoginPage from "@/pages/admin/AdminLoginPage";
 import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
 import StaffManagementPage from "@/pages/admin/StaffManagementPage";
 import PartsManagementPage from "@/pages/admin/PartsManagementPage";
+import PartRequestsPage from "@/pages/admin/PartRequestsPage";
 import VendorsPage from "@/pages/admin/VendorsPage";
 import VendorDetailPage from "@/pages/admin/VendorDetailPage";
 import PurchaseInvoicesPage from "@/pages/admin/PurchaseInvoicesPage";
@@ -41,6 +42,7 @@ function Router() {
       <Route path="/admin/reports/financial" component={() => <ProtectedRoute component={FinancialReportsPage} />} />
       <Route path="/admin/staff" component={() => <ProtectedRoute component={StaffManagementPage} />} />
       <Route path="/admin/parts" component={() => <ProtectedRoute component={PartsManagementPage} />} />
+      <Route path="/admin/part-requests" component={() => <ProtectedRoute component={PartRequestsPage} />} />
       <Route path="/admin/vendors/:id" component={() => <ProtectedRoute component={VendorDetailPage} />} />
       <Route path="/admin/vendors" component={() => <ProtectedRoute component={VendorsPage} />} />
       <Route path="/admin/purchase-invoices/new" component={() => <ProtectedRoute component={PurchaseInvoiceNewPage} />} />

@@ -45,6 +45,36 @@ Useful local URLs:
 - Database health check: `http://localhost:5217/api/healthz/database`
 - Swagger UI: `http://localhost:5217/swagger`
 
+## Email Sending
+
+Email sending uses MailKit with settings from the `EmailSettings` configuration section.
+Do not store SMTP passwords in `appsettings.json`.
+
+For local development, store the Gmail App Password in user secrets:
+
+```powershell
+dotnet user-secrets set "EmailSettings:Password" "YOUR_NEW_16_CHARACTER_APP_PASSWORD" --project .\Backend.csproj
+```
+
+Gmail setup notes:
+
+- Enable 2-Step Verification on the sender Google account.
+- Create a Gmail App Password from Google Account security settings.
+- Use the app password for `EmailSettings:Password`, not the normal Gmail password.
+- If an app password is exposed, revoke it and create a new one.
+
+Current low-stock alerts are sent to the configured `EmailSettings:AdminAlertEmail`.
+
+## Authentication Sessions
+
+Successful admin, staff, and customer login responses include:
+
+- `token`: JWT bearer token for API requests.
+- `sessionId`: database session id stored in `UserSessions`.
+- `expiresAtUtc`: session/token expiry.
+
+Protected APIs validate both the JWT and the active `UserSessions` row.
+
 ## Staff API
 
 Development seed login:
@@ -82,6 +112,13 @@ Main staff endpoints:
 - `GET /api/staff/reports/pending-credits`
 - `GET /api/staff/reports/sales-summary`
 - `POST /api/staff/reports/credit-reminders`
+
+Staff accounts are created and managed only through admin-authenticated staff management endpoints:
+
+- `GET /api/admin/staff`
+- `POST /api/admin/staff`
+- `PUT /api/admin/staff/{id}`
+- `DELETE /api/admin/staff/{id}`
 
 To point the Vite frontend at the real API instead of the local mock API:
 

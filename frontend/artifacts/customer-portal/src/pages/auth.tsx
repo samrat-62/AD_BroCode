@@ -7,12 +7,15 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Wrench } from "lucide-react";
 import { motion } from "framer-motion";
-import { signIn, useAuthStatus } from "@/lib/auth";
+import { loginCustomer, signUpCustomer, useAuthStatus } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AuthPage() {
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const isAuthenticated = useAuthStatus();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -20,14 +23,48 @@ export default function AuthPage() {
     }
   }, [isAuthenticated, setLocation]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setAuthError(null);
     setIsLoading(true);
-    // Mock API call
-    setTimeout(() => {
-      signIn();
+
+    const form = new FormData(e.currentTarget);
+    try {
+      await loginCustomer({
+        email: String(form.get("email") ?? ""),
+        password: String(form.get("password") ?? ""),
+      });
       setLocation("/dashboard");
-    }, 800);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to sign in.";
+      setAuthError(message);
+      toast({ title: "Sign in failed", description: message, variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRegisterSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setAuthError(null);
+    setIsLoading(true);
+
+    const form = new FormData(e.currentTarget);
+    try {
+      await signUpCustomer({
+        fullName: String(form.get("fullName") ?? ""),
+        email: String(form.get("email") ?? ""),
+        phone: String(form.get("phone") ?? ""),
+        password: String(form.get("password") ?? ""),
+      });
+      setLocation("/dashboard");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to create account.";
+      setAuthError(message);
+      toast({ title: "Registration failed", description: message, variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -81,17 +118,18 @@ export default function AuthPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4 px-0">
-                  <form onSubmit={handleSubmit} className="space-y-4">
+                  <form onSubmit={handleLoginSubmit} className="space-y-4">
+                    {authError ? <p className="text-sm text-destructive">{authError}</p> : null}
                     <div className="space-y-2">
                       <Label htmlFor="email">Email</Label>
-                      <Input id="email" type="email" placeholder="name@example.com" required defaultValue="demo@autoparts.com" />
+                      <Input id="email" name="email" type="email" placeholder="name@example.com" required />
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <Label htmlFor="password">Password</Label>
                         <a href="#" className="text-xs text-primary hover:underline">Forgot password?</a>
                       </div>
-                      <Input id="password" type="password" required defaultValue="password123" />
+                      <Input id="password" name="password" type="password" required />
                     </div>
                     <Button type="submit" className="w-full" disabled={isLoading}>
                       {isLoading ? "Signing in..." : "Sign In"}
@@ -110,18 +148,23 @@ export default function AuthPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4 px-0">
-                  <form onSubmit={handleSubmit} className="space-y-4">
+                  <form onSubmit={handleRegisterSubmit} className="space-y-4">
+                    {authError ? <p className="text-sm text-destructive">{authError}</p> : null}
                     <div className="space-y-2">
                       <Label htmlFor="r-name">Full Name</Label>
-                      <Input id="r-name" placeholder="John Doe" required />
+                      <Input id="r-name" name="fullName" placeholder="John Doe" required />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="r-email">Email</Label>
-                      <Input id="r-email" type="email" placeholder="name@example.com" required />
+                      <Input id="r-email" name="email" type="email" placeholder="name@example.com" required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="r-phone">Phone</Label>
+                      <Input id="r-phone" name="phone" type="tel" placeholder="+1 555 000 0000" required />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="r-password">Password</Label>
-                      <Input id="r-password" type="password" required />
+                      <Input id="r-password" name="password" type="password" minLength={8} required />
                     </div>
                     <Button type="submit" className="w-full" disabled={isLoading}>
                       {isLoading ? "Creating account..." : "Create Account"}

@@ -165,6 +165,62 @@ public sealed class AdminPurchaseInvoicesController : AdminControllerBase
         return CreatedAtAction(nameof(GetInvoice), new { id = invoice.Id }, ToDetailDto(created));
     }
 
+    [HttpDelete("purchase-invoices/{id:guid}")]
+    public async Task<IActionResult> DeleteInvoice(Guid id, CancellationToken cancellationToken)
+    {
+        var invoice = await _dbContext.PurchaseInvoices
+            .Include(invoice => invoice.LineItems)
+            .SingleOrDefaultAsync(invoice => invoice.Id == id, cancellationToken);
+
+        if (invoice is null)
+        {
+            return NotFound(new { message = "Purchase invoice was not found." });
+        }
+
+        var partIds = invoice.LineItems
+            .Select(item => item.PartId)
+            .Distinct()
+            .ToList();
+
+        var parts = await _dbContext.Parts
+            .Where(part => partIds.Contains(part.Id))
+            .ToDictionaryAsync(part => part.Id, cancellationToken);
+
+        foreach (var item in invoice.LineItems)
+        {
+            if (!parts.TryGetValue(item.PartId, out var part))
+            {
+                return Conflict(new { message = $"Part '{item.PartName}' was not found, so the invoice cannot be reversed." });
+            }
+
+            if (part.StockQuantity < item.Quantity)
+            {
+                return Conflict(new { message = $"Invoice cannot be deleted because '{part.Name}' stock would become negative." });
+            }
+        }
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        foreach (var item in invoice.LineItems)
+        {
+            var part = parts[item.PartId];
+            part.StockQuantity -= item.Quantity;
+            part.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+
+        _dbContext.PurchaseInvoices.Remove(invoice);
+        _dbContext.AdminNotifications.Add(new AdminNotification
+        {
+            Type = "warning",
+            Message = $"Purchase invoice {invoice.InvoiceNumber} was deleted."
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return NoContent();
+    }
+
     private async Task<string> GenerateInvoiceNumber(CancellationToken cancellationToken)
     {
         var year = DateTimeOffset.UtcNow.Year;

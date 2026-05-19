@@ -9,7 +9,8 @@ import {
   Settings, 
   Bell,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  PackageSearch
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ const navItems = [
   { name: "Financial Reports", href: "/admin/reports/financial", icon: BarChart3 },
   { name: "Staff", href: "/admin/staff", icon: Users },
   { name: "Parts", href: "/admin/parts", icon: Package },
+  { name: "Part Requests", href: "/admin/part-requests", icon: PackageSearch },
   { name: "Vendors", href: "/admin/vendors", icon: Truck },
   { name: "Purchase Invoices", href: "/admin/purchase-invoices", icon: FileText },
   { name: "Notifications", href: "/admin/notifications", icon: Bell },

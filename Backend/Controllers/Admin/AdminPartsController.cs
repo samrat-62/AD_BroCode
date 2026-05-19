@@ -2,6 +2,7 @@ using Backend.Data;
 using Backend.DTOs.Admin.Parts;
 using Backend.Models.Admin;
 using Backend.Models.Inventory;
+using Backend.Services.Email;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -11,10 +12,17 @@ namespace Backend.Controllers.Admin;
 public sealed class AdminPartsController : AdminControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly IEmailService _emailService;
+    private readonly ILogger<AdminPartsController> _logger;
 
-    public AdminPartsController(ApplicationDbContext dbContext)
+    public AdminPartsController(
+        ApplicationDbContext dbContext,
+        IEmailService emailService,
+        ILogger<AdminPartsController> logger)
     {
         _dbContext = dbContext;
+        _emailService = emailService;
+        _logger = logger;
     }
 
     [HttpGet("parts")]
@@ -88,15 +96,17 @@ public sealed class AdminPartsController : AdminControllerBase
             return BadRequest(new { message = "Category was not found." });
         }
 
-        if (request.VendorId.HasValue)
+        if (request.VendorId == Guid.Empty)
         {
-            var vendorExists = await _dbContext.Vendors
-                .AnyAsync(vendor => vendor.Id == request.VendorId.Value, cancellationToken);
+            return BadRequest(new { message = "Vendor is required." });
+        }
 
-            if (!vendorExists)
-            {
-                return BadRequest(new { message = "Vendor was not found." });
-            }
+        var vendorExists = await _dbContext.Vendors
+            .AnyAsync(vendor => vendor.Id == request.VendorId, cancellationToken);
+
+        if (!vendorExists)
+        {
+            return BadRequest(new { message = "Vendor was not found." });
         }
 
         var part = new Part
@@ -154,15 +164,17 @@ public sealed class AdminPartsController : AdminControllerBase
             return BadRequest(new { message = "Category was not found." });
         }
 
-        if (request.VendorId.HasValue)
+        if (request.VendorId == Guid.Empty)
         {
-            var vendorExists = await _dbContext.Vendors
-                .AnyAsync(vendor => vendor.Id == request.VendorId.Value, cancellationToken);
+            return BadRequest(new { message = "Vendor is required." });
+        }
 
-            if (!vendorExists)
-            {
-                return BadRequest(new { message = "Vendor was not found." });
-            }
+        var vendorExists = await _dbContext.Vendors
+            .AnyAsync(vendor => vendor.Id == request.VendorId, cancellationToken);
+
+        if (!vendorExists)
+        {
+            return BadRequest(new { message = "Vendor was not found." });
         }
 
         part.Name = request.Name.Trim();
@@ -246,6 +258,31 @@ public sealed class AdminPartsController : AdminControllerBase
             new AdminPartCategoryDto(category.Id, category.Name));
     }
 
+    [HttpDelete("parts/categories/{id:guid}")]
+    public async Task<IActionResult> DeleteCategory(Guid id, CancellationToken cancellationToken)
+    {
+        var category = await _dbContext.PartCategories
+            .SingleOrDefaultAsync(category => category.Id == id, cancellationToken);
+
+        if (category is null)
+        {
+            return NotFound(new { message = "Category was not found." });
+        }
+
+        var hasParts = await _dbContext.Parts
+            .AnyAsync(part => part.CategoryId == id, cancellationToken);
+
+        if (hasParts)
+        {
+            return Conflict(new { message = "Category cannot be deleted while parts are assigned to it." });
+        }
+
+        _dbContext.PartCategories.Remove(category);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return NoContent();
+    }
+
     [HttpGet("parts/low-stock")]
     public async Task<ActionResult<IReadOnlyList<AdminLowStockPartDto>>> ListLowStock(
         CancellationToken cancellationToken)
@@ -299,6 +336,29 @@ public sealed class AdminPartsController : AdminControllerBase
         });
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await SendLowStockAlertEmail(part, cancellationToken);
+    }
+
+    private async Task SendLowStockAlertEmail(Part part, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _emailService.SendLowStockAlertAsync(
+                new LowStockAlertEmail(
+                    part.Name,
+                    part.PartNumber,
+                    part.StockQuantity,
+                    part.ReorderLevel,
+                    part.Vendor?.Name),
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger.LogError(
+                exception,
+                "Failed to send low-stock email for part {PartId}.",
+                part.Id);
+        }
     }
 
     private static AdminPartDto ToDto(Part part)

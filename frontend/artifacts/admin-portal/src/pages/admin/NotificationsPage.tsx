@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, CheckCheck, AlertTriangle, Info, AlertCircle, CheckCircle } from "lucide-react";
+import { Bell, CheckCheck, AlertTriangle, Info, AlertCircle, CheckCircle, PackageSearch } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 const typeConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
   low_stock: { icon: AlertTriangle, color: "text-amber-500", label: "Low Stock" },
+  part_request: { icon: PackageSearch, color: "text-primary", label: "Part Request" },
   overdue_credit: { icon: AlertCircle, color: "text-orange-500", label: "Overdue" },
   system: { icon: Info, color: "text-blue-500", label: "System" },
   info: { icon: Info, color: "text-blue-500", label: "Info" },
@@ -41,7 +42,7 @@ export default function NotificationsPage() {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["/v1/notifications"] });
 
-  async function handleMarkRead(id: number) {
+  async function handleMarkRead(id: string) {
     try {
       await markReadMut.mutateAsync({ id });
       invalidate();

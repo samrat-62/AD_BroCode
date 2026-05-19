@@ -1,5 +1,6 @@
 using Backend.Data;
 using Backend.DTOs.Customer;
+using Backend.Models.Admin;
 using Backend.Models.Requests;
 using Backend.Models.Vehicles;
 using Microsoft.AspNetCore.Mvc;
@@ -77,11 +78,41 @@ public sealed class CustomerRequestsController : CustomerControllerBase
         };
 
         _dbContext.PartRequests.Add(partRequest);
+        _dbContext.AdminNotifications.Add(new AdminNotification
+        {
+            Type = "part_request",
+            Message = BuildPartRequestNotificationMessage(customer, partRequest, vehicle)
+        });
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         partRequest.Vehicle = vehicle;
 
         return StatusCode(StatusCodes.Status201Created, ToDto(partRequest));
+    }
+
+    private static string BuildPartRequestNotificationMessage(
+        Backend.Models.Users.Customer customer,
+        PartRequest request,
+        Vehicle? vehicle)
+    {
+        var customerName = string.IsNullOrWhiteSpace(customer.User.FullName)
+            ? customer.User.Email
+            : customer.User.FullName;
+
+        var message = $"New part request from {customerName}: {request.PartName}";
+
+        if (!string.IsNullOrWhiteSpace(request.PartNumber))
+        {
+            message += $" ({request.PartNumber})";
+        }
+
+        if (vehicle is not null)
+        {
+            message += $" for {FormatVehicleLabel(vehicle)}";
+        }
+
+        return $"{message}.";
     }
 
     private static PartRequestDto ToDto(PartRequest request)
@@ -102,6 +133,7 @@ public sealed class CustomerRequestsController : CustomerControllerBase
     {
         return status switch
         {
+            PartRequestStatus.Acknowledged => "acknowledged",
             PartRequestStatus.Found => "found",
             PartRequestStatus.Unavailable => "unavailable",
             _ => "pending"
